@@ -9,7 +9,7 @@
  * http://codex.wordpress.org/AJAX_in_Plugins.
  *
  * @package BuddyPress
- * @since 1.2
+ * @since BuddyPress (1.2)
  * @subpackage BP-Default
  */
 
@@ -124,7 +124,13 @@ function bp_dtheme_ajax_querystring( $query_string, $object ) {
 
 	// If page and search_terms have been passed via the AJAX post request, use those.
 	if ( ! empty( $_POST['page'] ) && '-1' != $_POST['page'] )
-		$qs[] = 'page=' . $_POST['page'];
+		$qs[] = 'page=' . absint( $_POST['page'] );
+
+	// exludes activity just posted and avoids duplicate ids
+	if ( ! empty( $_POST['exclude_just_posted'] ) ) {
+		$just_posted = wp_parse_id_list( $_POST['exclude_just_posted'] );
+		$qs[] = 'exclude=' . implode( ',', $just_posted );
+	}
 
 	$object_search_text = bp_get_search_default_text( $object );
  	if ( ! empty( $_POST['search_terms'] ) && $object_search_text != $_POST['search_terms'] && 'false' != $_POST['search_terms'] && 'undefined' != $_POST['search_terms'] )
@@ -168,18 +174,25 @@ function bp_dtheme_object_template_loader() {
 	if ( 'POST' !== strtoupper( $_SERVER['REQUEST_METHOD'] ) )
 		return;
 
+	// Bail if no object passed
+	if ( empty( $_POST['object'] ) )
+		return;
+
+	// Sanitize the object
+	$object = sanitize_title( $_POST['object'] );
+
+	// Bail if object is not an active component
+	if ( ! bp_is_active( $object ) )
+		return;
+
  	/**
 	 * AJAX requests happen too early to be seen by bp_update_is_directory()
 	 * so we do it manually here to ensure templates load with the correct
 	 * context. Without this check, templates will load the 'single' version
 	 * of themselves rather than the directory version.
 	 */
-
 	if ( ! bp_current_action() )
 		bp_update_is_directory( true, bp_current_component() );
-
-	// Sanitize the post object
-	$object = esc_attr( $_POST['object'] );
 
 	// Locate the object template
 	locate_template( array( "$object/$object-loop.php" ), true );
@@ -326,7 +339,7 @@ function bp_dtheme_new_activity_comment() {
 	bp_has_activities( 'display_comments=stream&hide_spam=false&include=' . $comment_id );
 
 	// Swap the current comment with the activity item we just loaded
-	$activities_template->activity = new stdClass();
+	$activities_template->activity                  = new stdClass;
 	$activities_template->activity->id              = $activities_template->activities[0]->item_id;
 	$activities_template->activity->current_comment = $activities_template->activities[0];
 
@@ -370,7 +383,7 @@ function bp_dtheme_delete_activity() {
 	$activity = new BP_Activity_Activity( (int) $_POST['id'] );
 
 	// Check access
-	if ( empty( $activity->user_id ) || ! bp_activity_user_can_delete( $activity ) )
+	if ( ! bp_activity_user_can_delete( $activity ) )
 		exit( '-1' );
 
 	// Call the action before the delete so plugins can still fetch information about it
@@ -536,7 +549,6 @@ function bp_dtheme_get_single_activity_content() {
 /**
  * Invites a friend to join a group via a POST request.
  *
- * @return unknown
  * @since BuddyPress (1.2)
  * @todo Audit return types
  */
@@ -881,11 +893,10 @@ function bp_dtheme_ajax_messages_delete() {
  * @since BuddyPress (1.2)
  */
 function bp_dtheme_ajax_messages_autocomplete_results() {
-	global $bp;
 
 	// Include everyone in the autocomplete, or just friends?
 	if ( bp_is_current_component( bp_get_messages_slug() ) )
-		$autocomplete_all = $bp->messages->autocomplete_all;
+		$autocomplete_all = buddypress()->messages->autocomplete_all;
 
 	$pag_page = 1;
 	$limit    = (int) $_GET['limit'] ? $_GET['limit'] : apply_filters( 'bp_autocomplete_max_results', 10 );
