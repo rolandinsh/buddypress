@@ -1,40 +1,42 @@
 <?php
-
 /**
  * BuddyPress Settings Actions
  *
  * @todo split actions into separate screen functions
  * @package BuddyPress
  * @subpackage SettingsActions
+ * @since 1.5.0
  */
 
-// Exit if accessed directly
-if ( !defined( 'ABSPATH' ) ) exit;
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
 
 /**
- * Handles the changing and saving of user email addressos and passwords
+ * Handles the changing and saving of user email addresses and passwords.
  *
  * We do quite a bit of logic and error handling here to make sure that users
  * do not accidentally lock themselves out of their accounts. We also try to
  * provide as accurate of feedback as possible without exposing anyone else's
- * inforation to them.
+ * information to them.
  *
  * Special considerations are made for super admins that are able to edit any
  * users accounts already, without knowing their existing password.
+ *
+ * @since 1.6.0
  *
  * @global BuddyPress $bp
  */
 function bp_settings_action_general() {
 
-	// Bail if not a POST action
+	// Bail if not a POST action.
 	if ( 'POST' !== strtoupper( $_SERVER['REQUEST_METHOD'] ) )
 		return;
 
-	// Bail if no submit action
+	// Bail if no submit action.
 	if ( ! isset( $_POST['submit'] ) )
 		return;
 
-	// Bail if not in settings
+	// Bail if not in settings.
 	if ( ! bp_is_settings_component() || ! bp_is_current_action( 'general' ) )
 		return;
 
@@ -51,27 +53,29 @@ function bp_settings_action_general() {
 	$pass_changed  = false;        // true if the user changes their password
 	$email_changed = false;        // true if the user changes their email
 	$feedback_type = 'error';      // success|error
-	$feedback      = array();      // array of strings for feedback
+	$feedback      = array();      // array of strings for feedback.
 
-	// Nonce check
+	// Nonce check.
 	check_admin_referer('bp_settings_general');
 
-	// Validate the user again for the current password when making a big change
+	// Validate the user again for the current password when making a big change.
 	if ( ( is_super_admin() ) || ( !empty( $_POST['pwd'] ) && wp_check_password( $_POST['pwd'], $bp->displayed_user->userdata->user_pass, bp_displayed_user_id() ) ) ) {
 
 		$update_user = get_userdata( bp_displayed_user_id() );
 
-		/** Email Change Attempt ******************************************/
+		/* Email Change Attempt ******************************************/
 
 		if ( !empty( $_POST['email'] ) ) {
 
-			// What is missing from the profile page vs signup - lets double check the goodies
-			$user_email = sanitize_email( esc_html( trim( $_POST['email'] ) ) );
+			// What is missing from the profile page vs signup -
+			// let's double check the goodies.
+			$user_email     = sanitize_email( esc_html( trim( $_POST['email'] ) ) );
+			$old_user_email = $bp->displayed_user->userdata->user_email;
 
-			// User is changing email address
-			if ( $bp->displayed_user->userdata->user_email != $user_email ) {
+			// User is changing email address.
+			if ( $old_user_email != $user_email ) {
 
-				// Run some tests on the email address
+				// Run some tests on the email address.
 				$email_checks = bp_core_validate_email_address( $user_email );
 
 				if ( true !== $email_checks ) {
@@ -88,70 +92,102 @@ function bp_settings_action_general() {
 					}
 				}
 
-				// Yay we made it!
+				// Store a hash to enable email validation.
 				if ( false === $email_error ) {
-					$update_user->user_email = $user_email;
+					$hash = wp_hash( $_POST['email'] );
+
+					$pending_email = array(
+						'hash'     => $hash,
+						'newemail' => $user_email,
+					);
+
+					bp_update_user_meta( bp_displayed_user_id(), 'pending_email_change', $pending_email );
+					$verify_link = bp_displayed_user_domain() . bp_get_settings_slug() . '/?verify_email_change=' . $hash;
+
+					// Send the verification email.
+					$args = array(
+						'tokens' => array(
+							'displayname'    => bp_core_get_user_displayname( bp_displayed_user_id() ),
+							'old-user.email' => $old_user_email,
+							'user.email'     => $user_email,
+							'verify.url'     => esc_url( $verify_link ),
+						),
+					);
+					bp_send_email( 'settings-verify-email-change', bp_displayed_user_id(), $args );
+
+					// We mark that the change has taken place so as to ensure a
+					// success message, even though verification is still required.
+					$_POST['email'] = $update_user->user_email;
 					$email_changed = true;
 				}
 
-			// No change
+			// No change.
 			} else {
 				$email_error = false;
 			}
 
-		// Email address cannot be empty
+		// Email address cannot be empty.
 		} else {
 			$email_error = 'empty';
 		}
 
-		/** Password Change Attempt ***************************************/
+		/* Password Change Attempt ***************************************/
 
 		if ( !empty( $_POST['pass1'] ) && !empty( $_POST['pass2'] ) ) {
 
-			// Password change attempt is successful
 			if ( ( $_POST['pass1'] == $_POST['pass2'] ) && !strpos( " " . $_POST['pass1'], "\\" ) ) {
-				$update_user->user_pass = $_POST['pass1'];
-				$pass_changed = true;
 
-			// Password change attempt was unsuccessful
+				// Password change attempt is successful.
+				if ( ( ! empty( $_POST['pwd'] ) && $_POST['pwd'] != $_POST['pass1'] ) || is_super_admin() )  {
+					$update_user->user_pass = $_POST['pass1'];
+					$pass_changed = true;
+
+				// The new password is the same as the current password.
+				} else {
+					$pass_error = 'same';
+				}
+
+			// Password change attempt was unsuccessful.
 			} else {
 				$pass_error = 'mismatch';
 			}
 
-		// Both password fields were empty
+		// Both password fields were empty.
 		} elseif ( empty( $_POST['pass1'] ) && empty( $_POST['pass2'] ) ) {
 			$pass_error = false;
 
-		// One of the password boxes was left empty
+		// One of the password boxes was left empty.
 		} elseif ( ( empty( $_POST['pass1'] ) && !empty( $_POST['pass2'] ) ) || ( !empty( $_POST['pass1'] ) && empty( $_POST['pass2'] ) ) ) {
 			$pass_error = 'empty';
 		}
 
 		// The structure of the $update_user object changed in WP 3.3, but
-		// wp_update_user() still expects the old format
+		// wp_update_user() still expects the old format.
 		if ( isset( $update_user->data ) && is_object( $update_user->data ) ) {
 			$update_user = $update_user->data;
 			$update_user = get_object_vars( $update_user );
 
 			// Unset the password field to prevent it from emptying out the
 			// user's user_pass field in the database.
-			// @see wp_update_user()
+			// @see wp_update_user().
 			if ( false === $pass_changed ) {
 				unset( $update_user['user_pass'] );
 			}
 		}
 
-		// Make sure these changes are in $bp for the current page load
+		// Clear cached data, so that the changed settings take effect
+		// on the current page load.
 		if ( ( false === $email_error ) && ( false === $pass_error ) && ( wp_update_user( $update_user ) ) ) {
+			wp_cache_delete( 'bp_core_userdata_' . bp_displayed_user_id(), 'bp' );
 			$bp->displayed_user->userdata = bp_core_get_core_userdata( bp_displayed_user_id() );
 		}
 
-	// Password Error
+	// Password Error.
 	} else {
 		$pass_error = 'invalid';
 	}
 
-	// Email feedback
+	// Email feedback.
 	switch ( $email_error ) {
 		case 'invalid' :
 			$feedback['email_invalid']  = __( 'That email address is invalid. Check the formatting and try again.', 'buddypress' );
@@ -166,11 +202,11 @@ function bp_settings_action_general() {
 			$feedback['email_empty']    = __( 'Email address cannot be empty.', 'buddypress' );
 			break;
 		case false :
-			// No change
+			// No change.
 			break;
 	}
 
-	// Password feedback
+	// Password feedback.
 	switch ( $pass_error ) {
 		case 'invalid' :
 			$feedback['pass_error']    = __( 'Your current password is invalid.', 'buddypress' );
@@ -181,17 +217,20 @@ function bp_settings_action_general() {
 		case 'empty' :
 			$feedback['pass_empty']    = __( 'One of the password fields was empty.', 'buddypress' );
 			break;
+		case 'same' :
+			$feedback['pass_same'] 	   = __( 'The new password must be different from the current password.', 'buddypress' );
+			break;
 		case false :
-			// No change
+			// No change.
 			break;
 	}
 
-	// No errors so show a simple success message
+	// No errors so show a simple success message.
 	if ( ( ( false === $email_error ) || ( false == $pass_error ) ) && ( ( true === $pass_changed ) || ( true === $email_changed ) ) ) {
 		$feedback[]    = __( 'Your settings have been saved.', 'buddypress' );
 		$feedback_type = 'success';
 
-	// Some kind of errors occurred
+	// Some kind of errors occurred.
 	} elseif ( ( ( false === $email_error ) || ( false === $pass_error ) ) && ( ( false === $pass_changed ) || ( false === $email_changed ) ) ) {
 		if ( bp_is_my_profile() ) {
 			$feedback['nochange'] = __( 'No changes were made to your account.', 'buddypress' );
@@ -200,31 +239,37 @@ function bp_settings_action_general() {
 		}
 	}
 
-	// Set the feedback
-	bp_core_add_message( implode( '</p><p>', $feedback ), $feedback_type );
+	// Set the feedback.
+	bp_core_add_message( implode( "\n", $feedback ), $feedback_type );
 
-	// Execute additional code
+	/**
+	 * Fires after the general settings have been saved, and before redirect.
+	 *
+	 * @since 1.5.0
+	 */
 	do_action( 'bp_core_general_settings_after_save' );
 
-	// Redirect to prevent issues with browser back button
+	// Redirect to prevent issues with browser back button.
 	bp_core_redirect( trailingslashit( bp_displayed_user_domain() . bp_get_settings_slug() . '/general' ) );
 }
 add_action( 'bp_actions', 'bp_settings_action_general' );
 
 /**
- * Handles the changing and saving of user notification settings
+ * Handles the changing and saving of user notification settings.
+ *
+ * @since 1.6.0
  */
 function bp_settings_action_notifications() {
 
-	// Bail if not a POST action
+	// Bail if not a POST action.
 	if ( 'POST' !== strtoupper( $_SERVER['REQUEST_METHOD'] ) )
 		return;
 
-	// Bail if no submit action
+	// Bail if no submit action.
 	if ( ! isset( $_POST['submit'] ) )
 		return;
 
-	// Bail if not in settings
+	// Bail if not in settings.
 	if ( ! bp_is_settings_component() || ! bp_is_current_action( 'notifications' ) )
 		return false;
 
@@ -236,19 +281,20 @@ function bp_settings_action_notifications() {
 
 	check_admin_referer( 'bp_settings_notifications' );
 
-	if ( isset( $_POST['notifications'] ) ) {
-		foreach ( (array) $_POST['notifications'] as $key => $value ) {
-			bp_update_user_meta( (int) bp_displayed_user_id(), $key, $value );
-		}
-	}
+	bp_settings_update_notification_settings( bp_displayed_user_id(), (array) $_POST['notifications'] );
 
-	// Switch feedback for super admins
+	// Switch feedback for super admins.
 	if ( bp_is_my_profile() ) {
 		bp_core_add_message( __( 'Your notification settings have been saved.',        'buddypress' ), 'success' );
 	} else {
 		bp_core_add_message( __( "This user's notification settings have been saved.", 'buddypress' ), 'success' );
 	}
 
+	/**
+	 * Fires after the notification settings have been saved, and before redirect.
+	 *
+	 * @since 1.5.0
+	 */
 	do_action( 'bp_core_notification_settings_after_save' );
 
 	bp_core_redirect( bp_displayed_user_domain() . bp_get_settings_slug() . '/notifications/' );
@@ -257,18 +303,20 @@ add_action( 'bp_actions', 'bp_settings_action_notifications' );
 
 /**
  * Handles the setting of user capabilities, spamming, hamming, role, etc...
+ *
+ * @since 1.6.0
  */
 function bp_settings_action_capabilities() {
 
-	// Bail if not a POST action
+	// Bail if not a POST action.
 	if ( 'POST' !== strtoupper( $_SERVER['REQUEST_METHOD'] ) )
 		return;
 
-	// Bail if no submit action
+	// Bail if no submit action.
 	if ( ! isset( $_POST['capabilities-submit'] ) )
 		return;
 
-	// Bail if not in settings
+	// Bail if not in settings.
 	if ( ! bp_is_settings_component() || ! bp_is_current_action( 'capabilities' ) )
 		return false;
 
@@ -278,44 +326,71 @@ function bp_settings_action_capabilities() {
 		return;
 	}
 
-	// Nonce check
+	// Only super admins can currently spam users (but they can't spam
+	// themselves).
+	if ( ! is_super_admin() || bp_is_my_profile() ) {
+		return;
+	}
+
+	// Nonce check.
 	check_admin_referer( 'capabilities' );
 
+	/**
+	 * Fires before the capabilities settings have been saved.
+	 *
+	 * @since 1.6.0
+	 */
 	do_action( 'bp_settings_capabilities_before_save' );
 
-	/** Spam **************************************************************/
+	/* Spam **************************************************************/
 
 	$is_spammer = !empty( $_POST['user-spammer'] ) ? true : false;
 
 	if ( bp_is_user_spammer( bp_displayed_user_id() ) != $is_spammer ) {
 		$status = ( true == $is_spammer ) ? 'spam' : 'ham';
 		bp_core_process_spammer_status( bp_displayed_user_id(), $status );
+
+		/**
+		 * Fires after processing a user as a spammer.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param int    $value  ID of the currently displayed user.
+		 * @param string $status Determined status of "spam" or "ham" for the displayed user.
+		 */
 		do_action( 'bp_core_action_set_spammer_status', bp_displayed_user_id(), $status );
 	}
 
-	/** Other *************************************************************/
+	/* Other *************************************************************/
 
+	/**
+	 * Fires after the capabilities settings have been saved and before redirect.
+	 *
+	 * @since 1.6.0
+	 */
 	do_action( 'bp_settings_capabilities_after_save' );
 
-	// Redirect to the root domain
+	// Redirect to the root domain.
 	bp_core_redirect( bp_displayed_user_domain() . bp_get_settings_slug() . '/capabilities/' );
 }
 add_action( 'bp_actions', 'bp_settings_action_capabilities' );
 
 /**
- * Handles the deleting of a user
+ * Handles the deleting of a user.
+ *
+ * @since 1.6.0
  */
 function bp_settings_action_delete_account() {
 
-	// Bail if not a POST action
+	// Bail if not a POST action.
 	if ( 'POST' !== strtoupper( $_SERVER['REQUEST_METHOD'] ) )
 		return;
 
-	// Bail if no submit action
+	// Bail if no submit action.
 	if ( ! isset( $_POST['delete-account-understand'] ) )
 		return;
 
-	// Bail if not in settings
+	// Bail if not in settings.
 	if ( ! bp_is_settings_component() || ! bp_is_current_action( 'delete-account' ) )
 		return false;
 
@@ -325,20 +400,95 @@ function bp_settings_action_delete_account() {
 		return;
 	}
 
-	// Nonce check
+	// Bail if account deletion is disabled.
+	if ( bp_disable_account_deletion() && ! bp_current_user_can( 'delete_users' ) ) {
+		return false;
+	}
+
+	// Nonce check.
 	check_admin_referer( 'delete-account' );
 
 	// Get username now because it might be gone soon!
 	$username = bp_get_displayed_user_fullname();
 
-	// delete the users account
+	// Delete the users account.
 	if ( bp_core_delete_account( bp_displayed_user_id() ) ) {
 
-		// Add feedback ater deleting a user
+		// Add feedback after deleting a user.
 		bp_core_add_message( sprintf( __( '%s was successfully deleted.', 'buddypress' ), $username ), 'success' );
 
-		// Redirect to the root domain
+		// Redirect to the root domain.
 		bp_core_redirect( bp_get_root_domain() );
 	}
 }
 add_action( 'bp_actions', 'bp_settings_action_delete_account' );
+
+/**
+ * Process email change verification or cancel requests.
+ *
+ * @since 2.1.0
+ */
+function bp_settings_verify_email_change(){
+	if ( ! bp_is_settings_component() ) {
+		return;
+	}
+
+	if ( ! bp_is_my_profile() ) {
+		return;
+	}
+
+	$redirect_to = trailingslashit( bp_displayed_user_domain() . bp_get_settings_slug() );
+
+	// Email change is being verified.
+	if ( isset( $_GET['verify_email_change'] ) ) {
+		$pending_email = bp_get_user_meta( bp_displayed_user_id(), 'pending_email_change', true );
+
+		// Bail if the hash provided doesn't match the one saved in the database.
+		if ( urldecode( $_GET['verify_email_change'] ) !== $pending_email['hash'] ) {
+			return;
+		}
+
+		$email_changed = wp_update_user( array(
+			'ID'         => bp_displayed_user_id(),
+			'user_email' => trim( $pending_email['newemail'] ),
+		) );
+
+		if ( $email_changed ) {
+			// Delete object cache for displayed user.
+			wp_cache_delete( 'bp_core_userdata_' . bp_displayed_user_id(), 'bp' );
+
+			// Delete the pending email change key.
+			bp_delete_user_meta( bp_displayed_user_id(), 'pending_email_change' );
+
+			// Post a success message and redirect.
+			bp_core_add_message( __( 'You have successfully verified your new email address.', 'buddypress' ) );
+		} else {
+			// Unknown error.
+			bp_core_add_message( __( 'There was a problem verifying your new email address. Please try again.', 'buddypress' ), 'error' );
+		}
+
+		bp_core_redirect( $redirect_to );
+		die();
+
+	// Email change is being dismissed.
+	} elseif ( ! empty( $_GET['dismiss_email_change'] ) ) {
+	        bp_delete_user_meta( bp_displayed_user_id(), 'pending_email_change' );
+		bp_core_add_message( __( 'You have successfully dismissed your pending email change.', 'buddypress' ) );
+
+		bp_core_redirect( $redirect_to );
+		die();
+	}
+}
+add_action( 'bp_actions', 'bp_settings_verify_email_change' );
+
+/**
+ * Removes 'Email' sub nav, if no component has registered options there.
+ *
+ * @since 2.2.0
+ */
+function bp_settings_remove_email_subnav() {
+	if ( ! has_action( 'bp_notification_settings' ) ) {
+		bp_core_remove_subnav_item( BP_SETTINGS_SLUG, 'notifications' );
+	}
+}
+add_action( 'bp_actions', 'bp_settings_remove_email_subnav' );

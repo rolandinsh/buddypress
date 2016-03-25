@@ -1,19 +1,24 @@
 <?php
-
 /**
- * BuddyPress Friends Actions
+ * BuddyPress Friends Actions.
  *
- * Action functions are exactly the same as screen functions, however they do not
- * have a template screen associated with them. Usually they will send the user
- * back to the default screen after execution.
+ * Action functions are exactly the same as screen functions, however they do
+ * not have a template screen associated with them. Usually they will send the
+ * user back to the default screen after execution.
  *
  * @package BuddyPress
  * @subpackage FriendsActions
+ * @since 1.5.0
  */
 
-// Exit if accessed directly
-if ( !defined( 'ABSPATH' ) ) exit;
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
 
+/**
+ * Catch and process friendship requests.
+ *
+ * @since 1.0.1
+ */
 function friends_action_add_friend() {
 	if ( !bp_is_friends_component() || !bp_is_current_action( 'add-friend' ) )
 		return false;
@@ -37,7 +42,7 @@ function friends_action_add_friend() {
 			bp_core_add_message( __( 'Friendship requested', 'buddypress' ) );
 		}
 
-	} else if ( 'is_friend' == $friendship_status ) {
+	} elseif ( 'is_friend' == $friendship_status ) {
 		bp_core_add_message( __( 'You are already friends with this user', 'buddypress' ), 'error' );
 	} else {
 		bp_core_add_message( __( 'You already have a pending friendship request with this user', 'buddypress' ), 'error' );
@@ -49,6 +54,11 @@ function friends_action_add_friend() {
 }
 add_action( 'bp_init', 'friends_action_add_friend' );
 
+/**
+ * Catch and process Remove Friendship requests.
+ *
+ * @since 1.0.1
+ */
 function friends_action_remove_friend() {
 	if ( !bp_is_friends_component() || !bp_is_current_action( 'remove-friend' ) )
 		return false;
@@ -72,7 +82,7 @@ function friends_action_remove_friend() {
 			bp_core_add_message( __( 'Friendship canceled', 'buddypress' ) );
 		}
 
-	} else if ( 'is_friends' == $friendship_status ) {
+	} elseif ( 'is_friends' == $friendship_status ) {
 		bp_core_add_message( __( 'You are not yet friends with this user', 'buddypress' ), 'error' );
 	} else {
 		bp_core_add_message( __( 'You have a pending friendship request with this user', 'buddypress' ), 'error' );

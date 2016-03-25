@@ -1,19 +1,19 @@
 <?php
-
 /**
- * BuddyPress Settings Screens
+ * BuddyPress Settings Screens.
  *
  * @package BuddyPress
  * @subpackage SettingsScreens
+ * @since 1.5.0
  */
 
-// Exit if accessed directly
-if ( !defined( 'ABSPATH' ) ) exit;
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
 
 /**
- * Show the general settings template
+ * Show the general settings template.
  *
- * @since BuddyPress (1.5)
+ * @since 1.5.0
  */
 function bp_settings_screen_general() {
 
@@ -22,13 +22,20 @@ function bp_settings_screen_general() {
 		return;
 	}
 
+	/**
+	 * Filters the template file path to use for the general settings screen.
+	 *
+	 * @since 1.6.0
+	 *
+	 * @param string $value Directory path to look in for the template file.
+	 */
 	bp_core_load_template( apply_filters( 'bp_settings_screen_general_settings', 'members/single/settings/general' ) );
 }
 
 /**
- * Show the notifications settings template
+ * Show the notifications settings template.
  *
- * @since BuddyPress (1.5)
+ * @since 1.5.0
  */
 function bp_settings_screen_notification() {
 
@@ -37,13 +44,20 @@ function bp_settings_screen_notification() {
 		return;
 	}
 
+	/**
+	 * Filters the template file path to use for the notification settings screen.
+	 *
+	 * @since 1.6.0
+	 *
+	 * @param string $value Directory path to look in for the template file.
+	 */
 	bp_core_load_template( apply_filters( 'bp_settings_screen_notification_settings', 'members/single/settings/notifications' ) );
 }
 
 /**
- * Show the delete-account settings template
+ * Show the delete-account settings template.
  *
- * @since BuddyPress (1.5)
+ * @since 1.5.0
  */
 function bp_settings_screen_delete_account() {
 
@@ -52,14 +66,20 @@ function bp_settings_screen_delete_account() {
 		return;
 	}
 
-	// Load the template
+	/**
+	 * Filters the template file path to use for the delete-account settings screen.
+	 *
+	 * @since 1.6.0
+	 *
+	 * @param string $value Directory path to look in for the template file.
+	 */
 	bp_core_load_template( apply_filters( 'bp_settings_screen_delete_account', 'members/single/settings/delete-account' ) );
 }
 
 /**
- * Show the capabilities settings template
+ * Show the capabilities settings template.
  *
- * @since BuddyPress (1.6)
+ * @since 1.6.0
  */
 function bp_settings_screen_capabilities() {
 
@@ -68,6 +88,12 @@ function bp_settings_screen_capabilities() {
 		return;
 	}
 
-	// Load the template
+	/**
+	 * Filters the template file path to use for the capabilities settings screen.
+	 *
+	 * @since 1.6.0
+	 *
+	 * @param string $value Directory path to look in for the template file.
+	 */
 	bp_core_load_template( apply_filters( 'bp_settings_screen_capabilities', 'members/single/settings/capabilities' ) );
 }

@@ -1,10 +1,21 @@
 <?php
-// Exit if accessed directly
-if ( !defined( 'ABSPATH' ) ) exit;
+/**
+ * BuddyPress Forums Screen Functions.
+ *
+ * @package BuddyPress
+ * @subpackage ForumsScreens
+ * @since 1.5.0
+ */
 
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Load the Forums directory.
+ */
 function bp_forums_directory_forums_setup() {
 
-	// Get BuddyPress once
+	// Get BuddyPress once.
 	$bp = buddypress();
 
 	if ( bp_is_forums_component() && ( !bp_current_action() || ( 'tag' == bp_current_action() && bp_action_variables() ) ) && !bp_current_item() ) {
@@ -18,6 +29,11 @@ function bp_forums_directory_forums_setup() {
 
 		bp_update_is_directory( true, 'forums' );
 
+		/**
+		 * Fires early in the initialization of bbPress-based areas of BuddyPress.
+		 *
+		 * @since 1.1.0
+		 */
 		do_action( 'bbpress_init' );
 
 		// Check to see if the user has posted a new topic from the forums page.
@@ -26,7 +42,7 @@ function bp_forums_directory_forums_setup() {
 
 			$bp->groups->current_group = groups_get_group( array( 'group_id' => $_POST['topic_group_id'] ) );
 			if ( !empty( $bp->groups->current_group->id ) ) {
-				// Auto join this user if they are not yet a member of this group
+				// Auto join this user if they are not yet a member of this group.
 				if ( !bp_current_user_can( 'bp_moderate' ) && 'public' == $bp->groups->current_group->status && !groups_is_user_member( bp_loggedin_user_id(), $bp->groups->current_group->id ) )
 					groups_join_group( $bp->groups->current_group->id );
 
@@ -59,100 +75,185 @@ function bp_forums_directory_forums_setup() {
 					bp_core_redirect( add_query_arg( 'new', '', bp_get_forums_directory_permalink() ) );
 				}
 
-			}	 else {
+			} else {
 				bp_core_add_message( __( 'Please pick the group forum where you would like to post this topic.', 'buddypress' ), 'error' );
 				bp_core_redirect( add_query_arg( 'new', '', bp_get_forums_directory_permalink() ) );
 			}
 		}
 
+		/**
+		 * Fires right before the loading of the forums directory screen template file.
+		 *
+		 * @since 1.1.0
+		 */
 		do_action( 'bp_forums_directory_forums_setup' );
 
+		/**
+		 * Filters the template to load for the forums directory screen.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param string $template Path to the forums template to load.
+		 */
 		bp_core_load_template( apply_filters( 'bp_forums_template_directory_forums_setup', 'forums/index' ) );
 	}
 }
 add_action( 'bp_screens', 'bp_forums_directory_forums_setup', 2 );
 
+/**
+ * Load the Topics Started screen.
+ */
 function bp_member_forums_screen_topics() {
+
+	/**
+	 * Fires right before the loading of the forums topics started screen template file.
+	 *
+	 * @since 1.5.0
+	 */
 	do_action( 'bp_member_forums_screen_topics' );
 
+	/**
+	 * Filters the template to load for the forums topics started screen.
+	 *
+	 * @since 1.5.0
+	 *
+	 * @param string $template Path to the forums topics started template to load.
+	 */
 	bp_core_load_template( apply_filters( 'bp_member_forums_screen_topics', 'members/single/home' ) );
 }
 
+/**
+ * Load the Replied To screen.
+ */
 function bp_member_forums_screen_replies() {
+
+	/**
+	 * Fires right before the loading of the forums replied to screen template file.
+	 *
+	 * @since 1.5.0
+	 */
 	do_action( 'bp_member_forums_screen_replies' );
 
+	/**
+	 * Filters the template to load for the forums replied to screen.
+	 *
+	 * @since 1.5.0
+	 *
+	 * @param string $template Path to the forums replied to template to load.
+	 */
 	bp_core_load_template( apply_filters( 'bp_member_forums_screen_replies', 'members/single/home' ) );
 }
 
 /**
- * Loads the template content for a user's Favorites forum tab.
+ * Load the template content for a user's Favorites forum tab.
  *
  * Note that this feature is not fully implemented at the moment.
- *
- * @package BuddyPress Forums
  */
 function bp_member_forums_screen_favorites() {
+
+	/**
+	 * Fires right before the loading of the forums favorites screen template file.
+	 *
+	 * @since 1.5.0
+	 */
 	do_action( 'bp_member_forums_screen_favorites' );
 
+	/**
+	 * Filters the template to load for the forums favorites screen.
+	 *
+	 * @since 1.5.0
+	 *
+	 * @param string $template Path to the forums favorites template to load.
+	 */
 	bp_core_load_template( apply_filters( 'bp_member_forums_screen_favorites', 'members/single/home' ) );
 }
 
+/**
+ * Load a single forum page.
+ */
 function bp_forums_screen_single_forum() {
 
 	if ( !bp_is_forums_component() || !bp_is_current_action( 'forum' ) || !bp_action_variable( 0 ) )
 		return false;
 
+	/**
+	 * Fires right before the loading of the forums single forum screen template file.
+	 *
+	 * @since 1.5.0
+	 */
 	do_action( 'bp_forums_screen_single_forum' );
 
+	/**
+	 * Filters the template to load for the forums single forum screen.
+	 *
+	 * @since 1.5.0
+	 *
+	 * @param string $template Path to the forums single forum template to load.
+	 */
 	bp_core_load_template( apply_filters( 'bp_forums_screen_single_forum', 'forums/single/forum' ) );
 }
 add_action( 'bp_screens', 'bp_forums_screen_single_forum' );
 
+/**
+ * Load a single forum topic page.
+ */
 function bp_forums_screen_single_topic() {
 
 	if ( !bp_is_forums_component() || !bp_is_current_action( 'topic' ) || !bp_action_variable( 0 ) )
 		return false;
 
+	/**
+	 * Fires right before the loading of the forums single topic screen template file.
+	 *
+	 * @since 1.5.0
+	 */
 	do_action( 'bp_forums_screen_single_topic' );
 
+	/**
+	 * Filters the template to load for the forums single topic screen.
+	 *
+	 * @since 1.5.0
+	 *
+	 * @param string $template Path to the forums single topic template to load.
+	 */
 	bp_core_load_template( apply_filters( 'bp_forums_screen_single_topic', 'forums/single/topic' ) );
 }
 add_action( 'bp_screens', 'bp_forums_screen_single_topic' );
 
 
-/** Theme Compatability *******************************************************/
+/** Theme Compatibility *******************************************************/
 
 /**
- * The main theme compat class for legacy BuddyPress forums, as powered by bbPress 1.x
+ * The main theme compat class for legacy BuddyPress forums.
  *
- * This class sets up the necessary theme compatability actions to safely output
+ * This class sets up the necessary theme compatibility actions to safely output
  * old forum template parts to the_title and the_content areas of a theme.
  *
- * @since BuddyPress (1.7)
+ * @since 1.7.0
  */
 class BP_Forum_Legacy_Theme_Compat {
 
 	/**
-	 * Setup the old forums component theme compatibility
+	 * Set up theme compatibility for the legacy forums component.
 	 *
-	 * @since BuddyPress (1.7)
+	 * @since 1.7.0
 	 */
 	public function __construct() {
 		add_action( 'bp_setup_theme_compat', array( $this, 'is_legacy_forum' ) );
 	}
 
 	/**
-	 * Are we looking at something that needs old forum theme compatability?
+	 * Are we looking at something that needs old forum theme compatibility?
 	 *
-	 * @since BuddyPress (1.7)
+	 * @since 1.7.0
 	 */
 	public function is_legacy_forum() {
 
-		// Bail if not looking at a group
+		// Bail if not looking at a group.
 		if ( ! bp_is_forums_component() )
 			return;
 
-		// forum Directory
+		// Forum Directory.
 		if ( ( ! bp_current_action() || ( 'tag' == bp_current_action() && bp_action_variables() ) ) && ! bp_current_item() ) {
 
 			if ( ! bp_forums_has_directory() )
@@ -177,13 +278,13 @@ class BP_Forum_Legacy_Theme_Compat {
 	/** Directory *************************************************************/
 
 	/**
-	 * Update the global $post with directory data
+	 * Update the global $post with directory data.
 	 *
-	 * @since BuddyPress (1.7)
+	 * @since 1.7.0
 	 */
 	public function directory_dummy_post() {
 
-		// Title based on ability to create groups
+		// Title based on ability to create groups.
 		if ( is_user_logged_in() ) {
 			$title = __( 'Forums', 'buddypress' ) . '&nbsp;<a class="button show-hide-new bp-title-button" href="#new-topic" id="new-topic-button">' . __( 'New Topic', 'buddypress' ) . '</a>';
 		} else {
@@ -196,20 +297,20 @@ class BP_Forum_Legacy_Theme_Compat {
 			'post_author'    => 0,
 			'post_date'      => 0,
 			'post_content'   => '',
-			'post_type'      => 'bp_forum',
+			'post_type'      => 'page',
 			'post_status'    => 'publish',
-			'is_archive'     => true,
+			'is_page'        => true,
 			'comment_status' => 'closed'
 		) );
 	}
 
 	/**
-	 * Filter the_content with the old forum index template part
+	 * Filter the_content with the old forum index template part.
 	 *
-	 * @since BuddyPress (1.7)
+	 * @since 1.7.0
 	 */
 	public function directory_content() {
-		bp_buffer_template_part( 'forums/index' );
+		return bp_buffer_template_part( 'forums/index', null, false );
 	}
 }
 new BP_Forum_Legacy_Theme_Compat();

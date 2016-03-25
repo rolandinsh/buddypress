@@ -1,7 +1,6 @@
 <?php
-
 /**
- * BuddyPress Members Actions
+ * BuddyPress Members Actions.
  *
  * Action functions are exactly the same as screen functions, however they do not
  * have a template screen associated with them. Usually they will send the user
@@ -9,38 +8,47 @@
  *
  * @package BuddyPress
  * @subpackage MembersActions
+ * @since 1.5.0
  */
 
-// Exit if accessed directly
-if ( !defined( 'ABSPATH' ) ) exit;
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
 
 /**
+ * Catch a "Mark as Spammer/Not Spammer" click from the toolbar.
+ *
  * When a site admin selects "Mark as Spammer/Not Spammer" from the admin menu
  * this action will fire and mark or unmark the user and their blogs as spam.
  * Must be a site admin for this function to run.
  *
- * @package BuddyPress Core
- * @param int $user_id Optional user ID to mark as spam
- * @global object $wpdb Global WordPress Database object
+ * Note: no longer used in the current state. See the Settings component.
+ *
+ * @param int $user_id Optional. User ID to mark as spam. Defaults to displayed user.
  */
 function bp_core_action_set_spammer_status( $user_id = 0 ) {
 
-	// Use displayed user if it's not yourself
+	// Only super admins can currently spam users (but they can't spam
+	// themselves).
+	if ( ! is_super_admin() || bp_is_my_profile() ) {
+		return;
+	}
+
+	// Use displayed user if it's not yourself.
 	if ( empty( $user_id ) )
 		$user_id = bp_displayed_user_id();
 
 	if ( bp_is_current_component( 'admin' ) && ( in_array( bp_current_action(), array( 'mark-spammer', 'unmark-spammer' ) ) ) ) {
 
-		// Check the nonce
+		// Check the nonce.
 		check_admin_referer( 'mark-unmark-spammer' );
 
-		// To spam or not to spam
+		// To spam or not to spam.
 		$status = bp_is_current_action( 'mark-spammer' ) ? 'spam' : 'ham';
 
-		// The heavy lifting
+		// The heavy lifting.
 		bp_core_process_spammer_status( $user_id, $status );
 
-		// Add feedback message. @todo - Error reporting
+		// Add feedback message. @todo - Error reporting.
 		if ( 'spam' == $status ) {
 			bp_core_add_message( __( 'User marked as spammer. Spam users are visible only to site admins.', 'buddypress' ) );
 		} else {
@@ -51,17 +59,20 @@ function bp_core_action_set_spammer_status( $user_id = 0 ) {
 		$is_spam = 'spam' == $status;
 		do_action( 'bp_core_action_set_spammer_status', bp_displayed_user_id(), $is_spam );
 
-		// Redirect back to where we came from
+		// Redirect back to where we came from.
 		bp_core_redirect( wp_get_referer() );
 	}
 }
-// Unhooked in BuddyPress (1.6) - moved to settings
-//add_action( 'bp_actions', 'bp_core_action_set_spammer_status' );
+
+/*
+ * Unhooked in 1.6.0 - moved to settings.
+ * add_action( 'bp_actions', 'bp_core_action_set_spammer_status' );
+ */
 
 /**
- * Allows a site admin to delete a user from the adminbar menu.
+ * Process user deletion requests.
  *
- * @package BuddyPress Core
+ * Note: No longer called here. See the Settings component.
  */
 function bp_core_action_delete_user() {
 
@@ -70,7 +81,7 @@ function bp_core_action_delete_user() {
 
 	if ( bp_is_current_component( 'admin' ) && bp_is_current_action( 'delete-user' ) ) {
 
-		// Check the nonce
+		// Check the nonce.
 		check_admin_referer( 'delete-user' );
 
 		$errors = false;
@@ -91,15 +102,16 @@ function bp_core_action_delete_user() {
 			bp_core_redirect( bp_loggedin_user_domain() );
 	}
 }
-// Unhooked in BuddyPress (1.6) - moved to settings
-//add_action( 'bp_actions', 'bp_core_action_delete_user' );
+
+/*
+ * Unhooked in 1.6.0 - moved to settings
+ * add_action( 'bp_actions', 'bp_core_action_delete_user' );
+ */
 
 /**
- * Returns the user_id for a user based on their username.
+ * Redirect to a random member page when visiting a ?random-member URL.
  *
- * @package BuddyPress Core
- * @param string $username Username to check.
- * @since BuddyPress (1.0)
+ * @since 1.0.0
  */
 function bp_core_get_random_member() {
 	if ( ! isset( $_GET['random-member'] ) )

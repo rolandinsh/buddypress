@@ -1,16 +1,17 @@
+/* global bp_activity_admin_vars, postboxes, wpAjax */
 (function( $ ) {
 
 /**
  * Activity reply object for the activity index screen
  *
- * @since BuddyPress (1.6)
+ * @since 1.6.0
  */
 var activityReply = {
 
 	/**
 	 * Attach event handler functions to the relevant elements.
 	 *
-	 * @since BuddyPress (1.6)
+	 * @since 1.6.0
 	 */
 	init : function() {
 		$(document).on( 'click', '.row-actions a.reply',              activityReply.open );
@@ -19,7 +20,7 @@ var activityReply = {
 
 		// Close textarea on escape
 		$(document).on( 'keyup', '#bp-activities:visible', function( e ) {
-			if ( 27 == e.which ) {
+			if ( 27 === e.which ) {
 				activityReply.close();
 			}
 		});
@@ -28,9 +29,9 @@ var activityReply = {
 	/**
 	 * Reveals the entire row when "reply" is pressed.
 	 *
-	 * @since BuddyPress (1.6)
+	 * @since 1.6.0
 	 */
-	open : function( e ) {
+	open : function() {
 		// Hide the container row, and move it to the new location
 		var box = $( '#bp-activities-container' ).hide();
 		$( this ).parents( 'tr' ).after( box );
@@ -45,11 +46,11 @@ var activityReply = {
 	/**
 	 * Hide and reset the entire row when "cancel", or escape, are pressed.
 	 *
-	 * @since BuddyPress (1.6)
+	 * @since 1.6.0
 	 */
-	close : function( e ) {
+	close : function() {
 		// Hide the container row
-		$('#bp-activities-container').fadeOut( '200', function () { 
+		$('#bp-activities-container').fadeOut( '200', function () {
 
 			// Empty and unfocus the text area
 			$( '#bp-activities' ).val( '' ).blur();
@@ -65,9 +66,9 @@ var activityReply = {
 	/**
 	 * Submits "form" via AJAX back to WordPress.
 	 *
-	 * @since BuddyPress (1.6)
+	 * @since 1.6.0
 	 */
-	send : function( e ) {
+	send : function() {
 		// Hide any existing error message, and show the loading spinner
 		$( '#bp-replysubmit .error' ).hide();
 		$( '#bp-replysubmit .waiting' ).show();
@@ -99,7 +100,7 @@ var activityReply = {
 	/**
 	 * send() error message handler
 	 *
-	 * @since BuddyPress (1.6)
+	 * @since 1.6.0
 	 */
 	error : function( r ) {
 		var er = r.statusText;
@@ -117,13 +118,13 @@ var activityReply = {
 	/**
 	 * send() success handler
 	 *
-	 * @since BuddyPress (1.6)
+	 * @since 1.6.0
 	 */
 	show : function ( xml ) {
 		var bg, id, response;
 
 		// Handle any errors in the response
-		if ( typeof( xml ) == 'string' ) {
+		if ( typeof( xml ) === 'string' ) {
 			activityReply.error( { 'responseText': xml } );
 			return false;
 		}
@@ -136,7 +137,7 @@ var activityReply = {
 		response = response.responses[0];
 
 		// Close and reset the reply row, and add the new Activity item into the list.
-		$('#bp-activities-container').fadeOut( '200', function () { 
+		$('#bp-activities-container').fadeOut( '200', function () {
 
 			// Empty and unfocus the text area
 			$( '#bp-activities' ).val( '' ).blur();
@@ -162,6 +163,13 @@ $(document).ready( function () {
 
 	// On the edit screen, unload the close/open toggle js for the action & content metaboxes
 	$( '#bp_activity_action h3, #bp_activity_content h3' ).unbind( 'click' );
+
+	// redo the post box toggles to reset the one made by comment.js in favor
+	// of activity administration page id so that metaboxes are still collapsible
+	// in single Activity Administration screen.
+	if ( typeof postboxes !== 'undefined' ) {
+		postboxes.add_postbox_toggles( bp_activity_admin_vars.page );
+	}
 });
 
 })(jQuery);

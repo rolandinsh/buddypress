@@ -50,6 +50,8 @@
 					<?php do_action( 'bp_signup_password_confirm_errors' ); ?>
 					<input type="password" name="signup_password_confirm" id="signup_password_confirm" value="" />
 
+					<?php do_action( 'bp_account_details_fields' ); ?>
+
 				</div><!-- #basic-details-section -->
 
 				<?php do_action( 'bp_after_account_details_fields' ); ?>
@@ -65,7 +67,7 @@
 						<h4><?php _e( 'Profile Details', 'buddypress' ); ?></h4>
 
 						<?php /* Use the profile field loop to render input fields for the 'base' profile field group */ ?>
-						<?php if ( bp_is_active( 'xprofile' ) ) : if ( bp_has_profile( 'profile_group_id=1' ) ) : while ( bp_profile_groups() ) : bp_the_profile_group(); ?>
+						<?php if ( bp_is_active( 'xprofile' ) ) : if ( bp_has_profile( array( 'profile_group_id' => 1, 'fetch_field_data' => false ) ) ) : while ( bp_profile_groups() ) : bp_the_profile_group(); ?>
 
 						<?php while ( bp_profile_fields() ) : bp_the_profile_field(); ?>
 
@@ -154,6 +156,13 @@
 
 								<?php endif; ?>
 
+								<?php if ( 'url' == bp_get_the_profile_field_type() ) : ?>
+
+									<label for="<?php bp_the_profile_field_input_name(); ?>"><?php bp_the_profile_field_name(); ?> <?php if ( bp_get_the_profile_field_is_required() ) : ?><?php _e( '(required)', 'buddypress' ); ?><?php endif; ?></label>
+									<input type="text" name="<?php bp_the_profile_field_input_name(); ?>" id="<?php bp_the_profile_field_input_name(); ?>" value="<?php bp_the_profile_field_edit_value(); ?>" <?php if ( bp_get_the_profile_field_is_required() ) : ?>aria-required="true"<?php endif; ?>/>
+
+								<?php endif; ?>
+
 								<?php do_action( 'bp_custom_profile_edit_fields_pre_visibility' ); ?>
 
 								<?php if ( bp_current_user_can( 'bp_xprofile_change_field_visibility' ) ) : ?>
@@ -188,6 +197,8 @@
 						<input type="hidden" name="signup_profile_field_ids" id="signup_profile_field_ids" value="<?php bp_the_profile_group_field_ids(); ?>" />
 
 						<?php endwhile; endif; endif; ?>
+
+						<?php do_action( 'bp_signup_profile_fields' ); ?>
 
 					</div><!-- #profile-details-section -->
 
@@ -228,6 +239,8 @@
 							<label><input type="radio" name="signup_blog_privacy" id="signup_blog_privacy_public" value="public"<?php if ( 'public' == bp_get_signup_blog_privacy_value() || !bp_get_signup_blog_privacy_value() ) : ?> checked="checked"<?php endif; ?> /> <?php _e( 'Yes', 'buddypress' ); ?></label>
 							<label><input type="radio" name="signup_blog_privacy" id="signup_blog_privacy_private" value="private"<?php if ( 'private' == bp_get_signup_blog_privacy_value() ) : ?> checked="checked"<?php endif; ?> /> <?php _e( 'No', 'buddypress' ); ?></label>
 
+							<?php do_action( 'bp_blog_details_fields' ); ?>
+
 						</div>
 
 					</div><!-- #blog-details-section -->
@@ -239,7 +252,7 @@
 				<?php do_action( 'bp_before_registration_submit_buttons' ); ?>
 
 				<div class="submit">
-					<input type="submit" name="signup_submit" id="signup_submit" value="<?php _e( 'Complete Sign Up', 'buddypress' ); ?>" />
+					<input type="submit" name="signup_submit" id="signup_submit" value="<?php esc_attr_e( 'Complete Sign Up', 'buddypress' ); ?>" />
 				</div>
 
 				<?php do_action( 'bp_after_registration_submit_buttons' ); ?>
