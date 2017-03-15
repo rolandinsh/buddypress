@@ -27,7 +27,7 @@ Visit the <a href="https://buddypress.org/">BuddyPress website</a> for documenta
 
 ## Installation
 
-### From your WordPress dashboard =
+### From your WordPress dashboard
 
 1. Visit 'Plugins > Add New'
 2. Search for 'BuddyPress'
@@ -69,44 +69,33 @@ Try <a href="https://wordpress.org/plugins/bbpress/">bbPress</a>. It integrates 
 
 ## Frequently Asked Questions
 
-### Can I use my existing WordPress theme?
+**Can I use my existing WordPress theme?**
 
 Yes! BuddyPress works out-of-the-box with nearly every WordPress theme.
 
-### Will this work on WordPress multisite?
+**Will this work on WordPress multisite?**
 
 Yes! If your WordPress installation has multisite enabled, BuddyPress will support the global tracking of blogs, posts, comments, and even custom post types with a little bit of custom code.
 
-### Where can I get support?
+**Where can I get support?**
 
 Our community provides free support at <a href="https://buddypress.org/support/">https://buddypress.org/support/</a>.
 
-### Where can I find documentation?
+**Where can I find documentation?**
 
 Our codex can be found at <a href="https://codex.buddypress.org/">https://codex.buddypress.org/</a>.
 
-### Where can I report a bug?
+**Where can I report a bug?**
 
 Report bugs, suggest ideas, and participate in development at <a href="https://buddypress.trac.wordpress.org/">https://buddypress.trac.wordpress.org</a>.
 
-### Where can I get the bleeding edge version of BuddyPress? 
+**Where can I get the bleeding edge version of BuddyPress?** 
 
 Check out the development trunk of BuddyPress from Subversion at <a href="https://buddypress.svn.wordpress.org/trunk/">https://buddypress.svn.wordpress.org/trunk/</a>, or clone from Git at git://buddypress.git.wordpress.org/.
 
-## Who builds BuddyPress?
+**Who builds BuddyPress?**
 
 BuddyPress is free software, built by an international community of volunteers. Some contributors to BuddyPress are employed by companies that use BuddyPress, while others are consultants who offer BuddyPress-related services for hire. No one is paid by the BuddyPress project for his or her contributions. If you would like to provide monetary support to BuddyPress, please consider a donation to the <a href="http://wordpressfoundation.org">WordPress Foundation</a>, or ask your favorite contributor how they prefer to have their efforts rewarded.
-
-## Screenshots 
-
-1. **Activity Streams** - Global, personal, and group activity streams with threaded commenting, direct posting, favoriting and @mentions. All with full RSS feeds and email notification support.
-2. **Extended Profiles** - Fully editable profile fields allow you to define the fields users can fill in to describe themselves. Tailor profile fields to suit your audience.
-3. **User Settings** - Give your users complete control over profile and notification settings. Settings are fully integrated into your theme, and can be disabled by the administrator.
-4. **Extensible Groups** - Powerful public, private or hidden groups allow your users to break the discussion down into specific topics. Extend groups with your own custom features using the group extension API.
-5. **Friend Connections** - Let your users make connections so they can track the activity of others, or filter to show only those users they care about the most.
-6. **Private Messaging** - Private messaging will allow your users to talk to each other directly and in private. Not just limited to one-on-one discussions, your users can send messages to multiple recipients.
-7. **Site Tracking** - Track posts and comments in the activity stream, and allow your users to add their own blogs using WordPress' Multisite feature.
-8. **Notifications** - Keep your members up-to-date with relevant activity via toolbar and email notifications.
 
 ## Languages 
 
@@ -117,6 +106,4 @@ Please consider helping translate BuddyPress at our <a href="https://translate.w
 
 ## Changelog
 
-
-### Older
 See: https://codex.buddypress.org/releases/
