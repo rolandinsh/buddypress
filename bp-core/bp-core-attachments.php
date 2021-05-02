@@ -11,21 +11,6 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Check if the current WordPress version is using Plupload 2.1.1
- *
- * Plupload 2.1.1 was introduced in WordPress 3.9. Our bp-plupload.js
- * script requires it. So we need to make sure the current WordPress
- * match with our needs.
- *
- * @since 2.3.0
- *
- * @return bool True if WordPress is 3.9+, false otherwise.
- */
-function bp_attachments_is_wp_version_supported() {
-	return (bool) version_compare( bp_get_major_wp_version(), '3.9', '>=' );
-}
-
-/**
  * Get the Attachments Uploads dir data.
  *
  * @since 2.4.0
@@ -81,6 +66,58 @@ function bp_attachments_uploads_dir_get( $data = '' ) {
 	 * @param string       $data   The data requested
 	 */
 	return apply_filters( 'bp_attachments_uploads_dir_get', $retval, $data );
+}
+
+/**
+ * Gets the upload dir array for cover images.
+ *
+ * @since 3.0.0
+ *
+ * @return array See wp_upload_dir().
+ */
+function bp_attachments_cover_image_upload_dir( $args = array() ) {
+	// Default values are for members.
+	$object_id = bp_displayed_user_id();
+
+	if ( empty( $object_id ) ) {
+		$object_id = bp_loggedin_user_id();
+	}
+
+	$object_directory = 'members';
+
+	// We're in a group, edit default values.
+	if ( bp_is_group() || bp_is_group_create() ) {
+		$object_id        = bp_get_current_group_id();
+		$object_directory = 'groups';
+	}
+
+	$r = bp_parse_args( $args, array(
+		'object_id' => $object_id,
+		'object_directory' => $object_directory,
+	), 'cover_image_upload_dir' );
+
+
+	// Set the subdir.
+	$subdir  = '/' . $r['object_directory'] . '/' . $r['object_id'] . '/cover-image';
+
+	$upload_dir = bp_attachments_uploads_dir_get();
+
+	/**
+	 * Filters the cover image upload directory.
+	 *
+	 * @since 2.4.0
+	 *
+	 * @param array $value      Array containing the path, URL, and other helpful settings.
+	 * @param array $upload_dir The original Uploads dir.
+	 */
+	return apply_filters( 'bp_attachments_cover_image_upload_dir', array(
+		'path'    => $upload_dir['basedir'] . $subdir,
+		'url'     => set_url_scheme( $upload_dir['baseurl'] ) . $subdir,
+		'subdir'  => $subdir,
+		'basedir' => $upload_dir['basedir'],
+		'baseurl' => set_url_scheme( $upload_dir['baseurl'] ),
+		'error'   => false,
+	), $upload_dir );
 }
 
 /**
@@ -235,7 +272,7 @@ function bp_attachments_check_filetype( $file, $filename, $allowed_mimes ) {
  * @param array  $args {
  *     @type int    $item_id   The ID of the object (Required). Default: 0.
  *     @type string $object    The object type (eg: group, user, blog) (Required). Default: 'user'.
- *     @type string $component The component for the object (eg: groups, xprofile, blogs). Default: ''.
+ *     @type string $component The component for the object (eg: groups, members, blogs). Default: ''.
  *     @type string $image     The absolute path to the image (Required). Default: ''.
  *     @type int    $crop_w    Crop width. Default: 0.
  *     @type int    $crop_h    Crop height. Default: 0.
@@ -265,14 +302,14 @@ function bp_attachments_create_item_type( $type = 'avatar', $args = array() ) {
 	}
 
 	// Make sure the file path is safe.
-	if ( 0 !== validate_file( $r['image'] ) ) {
+	if ( 1 === validate_file( $r['image'] ) ) {
 		return false;
 	}
 
 	// Set the component if not already done.
 	if ( empty( $r['component'] ) ) {
 		if ( 'user' === $r['object'] ) {
-			$r['component'] = 'xprofile';
+			$r['component'] = 'members';
 		} else {
 			$r['component'] = $r['object'] . 's';
 		}
@@ -304,15 +341,15 @@ function bp_attachments_create_item_type( $type = 'avatar', $args = array() ) {
 		if ( is_callable( $r['component'] . '_avatar_upload_dir' ) ) {
 			$dir_args = array( $r['item_id'] );
 
-			// In case  of xprofile, we need an extra argument.
-			if ( 'xprofile' === $r['component'] ) {
+			// In case  of members, we need an extra argument.
+			if ( 'members' === $r['component'] ) {
 				$dir_args = array( false, $r['item_id'] );
 			}
 
 			$attachment_data = call_user_func_array( $r['component'] . '_avatar_upload_dir', $dir_args );
 		}
 	} elseif ( 'cover_image' === $type ) {
-		$attachment_data = bp_attachments_uploads_dir_get();
+		$attachment_data = bp_attachments_cover_image_upload_dir();
 
 		// The BP Attachments Uploads Dir is not set, stop.
 		if ( ! $attachment_data ) {
@@ -322,7 +359,7 @@ function bp_attachments_create_item_type( $type = 'avatar', $args = array() ) {
 		// Default to members for xProfile.
 		$object_subdir = 'members';
 
-		if ( 'xprofile' !== $r['component'] ) {
+		if ( 'members' !== $r['component'] ) {
 			$object_subdir = sanitize_key( $r['component'] );
 		}
 
@@ -447,7 +484,7 @@ function bp_attachments_get_attachment( $data = 'url', $args = array() ) {
 	$type_subdir = $r['object_dir'] . '/' . $r['item_id'] . '/' . $r['type'];
 	$type_dir    = trailingslashit( $bp_attachments_uploads_dir['basedir'] ) . $type_subdir;
 
-	if ( ! is_dir( $type_dir ) ) {
+	if ( 1 === validate_file( $type_dir ) || ! is_dir( $type_dir ) ) {
 		return $attachment_data;
 	}
 
@@ -512,7 +549,7 @@ function bp_attachments_delete_file( $args = array() ) {
 	 * @since 2.5.1
 	 *
 	 * @param bool $value Whether or not to delete the BuddyPress attachment.
-`	 * @param array $args Array of arguments for the attachment deletion.
+	 * @param array $args Array of arguments for the attachment deletion.
 	 */
 	if ( ! apply_filters( 'bp_attachments_pre_delete_file', true, $args ) ) {
 		return true;
@@ -592,9 +629,19 @@ function bp_attachments_get_plupload_default_settings() {
  * @return array Plupload default localization strings.
  */
 function bp_attachments_get_plupload_l10n() {
-	// Localization strings.
-	return apply_filters( 'bp_attachments_get_plupload_l10n', array(
+	/**
+	 * Use this filter to edit localization strings.
+	 *
+	 * @since 2.3.0
+	 *
+	 * @param array $value An associative array of the localization strings.
+	 */
+	return apply_filters(
+		'bp_attachments_get_plupload_l10n',
+		array(
 			'queue_limit_exceeded'      => __( 'You have attempted to queue too many files.', 'buddypress' ),
+
+			/* translators: %s: File name. */
 			'file_exceeds_size_limit'   => __( '%s exceeds the maximum upload size for this site.', 'buddypress' ),
 			'zero_byte_file'            => __( 'This file is empty. Please try another.', 'buddypress' ),
 			'invalid_filetype'          => __( 'This file type is not allowed. Please try another.', 'buddypress' ),
@@ -606,7 +653,11 @@ function bp_attachments_get_plupload_l10n() {
 			'upload_limit_exceeded'     => __( 'You may only upload 1 file.', 'buddypress' ),
 			'http_error'                => __( 'HTTP error.', 'buddypress' ),
 			'upload_failed'             => __( 'Upload failed.', 'buddypress' ),
+
+			/* translators: 1: Opening link tag, 2: Closing link tag. */
 			'big_upload_failed'         => __( 'Please try uploading this file with the %1$sbrowser uploader%2$s.', 'buddypress' ),
+
+			/* translators: %s: File name. */
 			'big_upload_queued'         => __( '%s exceeds the maximum upload size for the multi-file uploader when used in your browser.', 'buddypress' ),
 			'io_error'                  => __( 'IO error.', 'buddypress' ),
 			'security_error'            => __( 'Security error.', 'buddypress' ),
@@ -615,9 +666,12 @@ function bp_attachments_get_plupload_l10n() {
 			'dismiss'                   => __( 'Dismiss', 'buddypress' ),
 			'crunching'                 => __( 'Crunching&hellip;', 'buddypress' ),
 			'unique_file_warning'       => __( 'Make sure to upload a unique file', 'buddypress' ),
+
+			/* translators: %s: File name. */
 			'error_uploading'           => __( '&#8220;%s&#8221; has failed to upload.', 'buddypress' ),
 			'has_avatar_warning'        => __( 'If you&#39;d like to delete the existing profile photo but not upload a new one, please use the delete tab.', 'buddypress' )
-	) );
+		)
+	);
 }
 
 /**
@@ -766,8 +820,8 @@ function bp_attachments_enqueue_scripts( $class = '' ) {
 		// Cover images only need 1 file and 1 only!
 		$defaults['multi_selection'] = false;
 
-		// Default cover component is xprofile.
-		$cover_component = 'xprofile';
+		// Default cover component is members.
+		$cover_component = 'members';
 
 		// Get the object we're editing the cover image of.
 		$object = $defaults['multipart_params']['bp_params']['object'];
@@ -784,10 +838,11 @@ function bp_attachments_enqueue_scripts( $class = '' ) {
 		// Set warning messages.
 		$strings['cover_image_warnings'] = apply_filters( 'bp_attachments_cover_image_ui_warnings', array(
 			'dimensions'  => sprintf(
-					__( 'For better results, make sure to upload an image that is larger than %1$spx wide, and %2$spx tall.', 'buddypress' ),
-					(int) $cover_dimensions['width'],
-					(int) $cover_dimensions['height']
-				),
+				/* translators: 1: the advised width size in pixels. 2: the advised height size in pixels. */
+				__( 'For better results, make sure to upload an image that is larger than %1$spx wide, and %2$spx tall.', 'buddypress' ),
+				(int) $cover_dimensions['width'],
+				(int) $cover_dimensions['height']
+			),
 		) );
 	}
 
@@ -861,7 +916,7 @@ function bp_attachments_current_user_can( $capability, $args = array() ) {
 					$can = (bool) groups_is_user_admin( bp_loggedin_user_id(), $args['item_id'] ) || bp_current_user_can( 'bp_moderate' );
 				}
 			// User profile photo.
-			} elseif ( bp_is_active( 'xprofile' ) && 'user' === $args['object'] ) {
+			} elseif ( bp_is_active( 'members' ) && 'user' === $args['object'] ) {
 				$can = bp_loggedin_user_id() === (int) $args['item_id'] || bp_current_user_can( 'bp_moderate' );
 			}
 		/**
@@ -921,23 +976,25 @@ function bp_attachments_json_response( $success, $is_html4 = false, $data = null
  * @return bool
  */
 function bp_attachments_get_template_part( $slug ) {
-	$attachment_template_part = 'assets/_attachments/' . $slug;
+	$switched = false;
 
-	// Load the attachment template in WP Administration screens.
-	if ( is_admin() && ( ! defined( 'DOING_AJAX' ) || ! DOING_AJAX ) ) {
-		$attachment_admin_template_part = buddypress()->themes_dir . '/bp-legacy/buddypress/' . $attachment_template_part . '.php';
-
-		// Check whether the template part exists.
-		if ( ! file_exists( $attachment_admin_template_part ) ) {
-			return false;
+	/*
+	 * Use bp-legacy attachment template part for older bp-default themes or if in
+	 * admin area.
+	 */
+	if ( ! bp_use_theme_compat_with_current_theme() || ( is_admin() && ( ! defined( 'DOING_AJAX' ) || ! DOING_AJAX ) ) ) {
+		$current = bp_get_theme_compat_id();
+		if ( 'legacy' !== $current ) {
+			$switched = true;
+			bp_setup_theme_compat( 'legacy' );
 		}
+	}
 
-		// Load the template part.
-		require( $attachment_admin_template_part );
+	// Load the template part.
+	bp_get_template_part( 'assets/_attachments/' . $slug );
 
-	// Load the attachment template in WP_USE_THEMES env.
-	} else {
-		bp_get_template_part( $attachment_template_part );
+	if ( $switched ) {
+		bp_setup_theme_compat( $current );
 	}
 }
 
@@ -948,10 +1005,10 @@ function bp_attachments_get_template_part( $slug ) {
  *
  * @since 2.4.0
  *
- * @param string $component The component to get the settings for ("xprofile" for user or "groups").
- * @return array|bool The cover image settings in array, false on failure.
+ * @param string $component The component to get the settings for ("members" for user or "groups").
+ * @return false|array The cover image settings in array, false on failure.
  */
-function bp_attachments_get_cover_image_settings( $component = 'xprofile' ) {
+function bp_attachments_get_cover_image_settings( $component = 'members' ) {
 	// Default parameters.
 	$args = array();
 
@@ -962,24 +1019,42 @@ function bp_attachments_get_cover_image_settings( $component = 'xprofile' ) {
 		$args = (array) $cover_image;
 	}
 
+	// Set default args.
+	$default_args = wp_parse_args(
+		$args,
+		array(
+			'components'    => array(),
+			'width'         => 1300,
+			'height'        => 225,
+			'callback'      => '',
+			'theme_handle'  => '',
+			'default_cover' => '',
+		)
+	);
+
+	// Handle deprecated xProfile fitler.
+	if ( 'members' === $component ) {
+		/** This filter is documented in wp-includes/deprecated.php */
+		$args = apply_filters_deprecated( 'bp_before_xprofile_cover_image_settings_parse_args', array( $default_args ), '6.0.0', 'bp_before_members_cover_image_settings_parse_args' );
+	}
+
 	/**
 	 * Then let people override/set the feature using this dynamic filter
 	 *
 	 * Eg: for the user's profile cover image use:
-	 * add_filter( 'bp_before_xprofile_cover_image_settings_parse_args', 'your_filter', 10, 1 );
+	 * add_filter( 'bp_before_members_cover_image_settings_parse_args', 'your_filter', 10, 1 );
 	 *
 	 * @since 2.4.0
 	 *
 	 * @param array $settings The cover image settings
 	 */
-	$settings = bp_parse_args( $args, array(
-		'components'    => array(),
-		'width'         => 1300,
-		'height'        => 225,
-		'callback'      => '',
-		'theme_handle'  => '',
-		'default_cover' => '',
-	), $component . '_cover_image_settings' );
+	$settings = bp_parse_args( $args, $default_args, $component . '_cover_image_settings' );
+
+	// Handle deprecated xProfile fitler.
+	if ( 'members' === $component ) {
+		/** This filter is documented in wp-includes/deprecated.php */
+		$settings = apply_filters_deprecated( 'bp_after_xprofile_cover_image_settings_parse_args', array( $settings ), '6.0.0', 'bp_after_members_cover_image_settings_parse_args' );
+	}
 
 	if ( empty( $settings['components'] ) || empty( $settings['callback'] ) || empty( $settings['theme_handle'] ) ) {
 		return false;
@@ -999,10 +1074,10 @@ function bp_attachments_get_cover_image_settings( $component = 'xprofile' ) {
  *
  * @since 2.4.0
  *
- * @param string $component The BuddyPress component concerned ("xprofile" for user or "groups").
+ * @param string $component The BuddyPress component concerned ("members" for user or "groups").
  * @return array|bool An associative array containing the advised width and height for the cover image. False if settings are empty.
  */
-function bp_attachments_get_cover_image_dimensions( $component = 'xprofile' ) {
+function bp_attachments_get_cover_image_dimensions( $component = 'members' ) {
 	// Let's prevent notices when setting the warning strings.
 	$default = array( 'width' => 0, 'height' => 0 );
 
@@ -1038,8 +1113,8 @@ function bp_attachments_cover_image_is_edit() {
 	$retval = false;
 
 	$current_component = bp_current_component();
-	if ( bp_is_active( 'xprofile' ) && bp_is_current_component( 'xprofile' ) ) {
-		$current_component = 'xprofile';
+	if ( bp_is_user() ) {
+		$current_component = 'members';
 	}
 
 	if ( ! bp_is_active( $current_component, 'cover_image' ) ) {
@@ -1082,6 +1157,7 @@ function bp_attachments_get_user_has_cover_image( $user_id = 0 ) {
  * Does the group has a cover image?
  *
  * @since 2.4.0
+ * @since 6.0.0 Renamed the filter coherently.
  *
  * @param int $group_id Group ID to check cover image existence for.
  * @return bool True if the group has a cover image, false otherwise.
@@ -1096,7 +1172,7 @@ function bp_attachments_get_group_has_cover_image( $group_id = 0 ) {
 		'item_id'    => $group_id,
 	) );
 
-	return (bool) apply_filters( 'bp_attachments_get_user_has_cover_image', $cover_src, $group_id );
+	return (bool) apply_filters( 'bp_attachments_get_group_has_cover_image', $cover_src, $group_id );
 }
 
 /**
@@ -1106,11 +1182,11 @@ function bp_attachments_get_group_has_cover_image( $group_id = 0 ) {
  *
  * @param array                          $args {
  *     @type string $file            The absolute path to the image. Required.
- *     @type string $component       The component for the object (eg: groups, xprofile). Required.
+ *     @type string $component       The component for the object (eg: groups, members). Required.
  *     @type string $cover_image_dir The Cover image dir to write the image into. Required.
  * }
  * @param BP_Attachment_Cover_Image|null $cover_image_class The class to use to fit the cover image.
- * @return bool|array An array containing cover image data on success, false otherwise.
+ * @return false|array An array containing cover image data on success, false otherwise.
  */
 function bp_attachments_cover_image_generate_file( $args = array(), $cover_image_class = null ) {
 	// Bail if an argument is missing.
@@ -1130,8 +1206,10 @@ function bp_attachments_cover_image_generate_file( $args = array(), $cover_image
 		$cover_image_class = new BP_Attachment_Cover_Image();
 	}
 
+	$upload_dir = bp_attachments_cover_image_upload_dir();
+
 	// Make sure the file is inside the Cover Image Upload path.
-	if ( false === strpos( $args['file'], $cover_image_class->upload_path ) ) {
+	if ( false === strpos( $args['file'], $upload_dir['basedir'] ) ) {
 		return false;
 	}
 
@@ -1189,35 +1267,26 @@ function bp_attachments_cover_image_generate_file( $args = array(), $cover_image
  *                     error message otherwise.
  */
 function bp_attachments_cover_image_ajax_upload() {
-	// Bail if not a POST action.
-	if ( 'POST' !== strtoupper( $_SERVER['REQUEST_METHOD'] ) ) {
+	if ( ! bp_is_post_request() ) {
 		wp_die();
 	}
 
-	/**
-	 * Sending the json response will be different if
-	 * the current Plupload runtime is html4
-	 */
-	$is_html4 = false;
-	if ( ! empty( $_POST['html4' ] ) ) {
-		$is_html4 = true;
-	}
-
-	// Check the nonce.
 	check_admin_referer( 'bp-uploader' );
 
-	// Init the BuddyPress parameters.
-	$bp_params = array();
+	// Sending the json response will be different if the current Plupload runtime is html4.
+	$is_html4 = ! empty( $_POST['html4' ] );
 
-	// We need it to carry on.
-	if ( ! empty( $_POST['bp_params'] ) ) {
-		$bp_params = bp_parse_args( $_POST['bp_params'], array(
-			'object'  => 'user',
-			'item_id' => bp_loggedin_user_id(),
-		), 'attachments_cover_image_ajax_upload' );
-	} else {
+	if ( empty( $_POST['bp_params'] ) ) {
 		bp_attachments_json_response( false, $is_html4 );
 	}
+
+	$bp_params = bp_parse_args( $_POST['bp_params'], array(
+		'object'  => 'user',
+		'item_id' => bp_loggedin_user_id(),
+	), 'attachments_cover_image_ajax_upload' );
+
+	$bp_params['item_id'] = (int) $bp_params['item_id'];
+	$bp_params['object']  = sanitize_text_field( $bp_params['object'] );
 
 	// We need the object to set the uploads dir filter.
 	if ( empty( $bp_params['object'] ) ) {
@@ -1234,7 +1303,7 @@ function bp_attachments_cover_image_ajax_upload() {
 
 	// Member's cover image.
 	if ( 'user' === $bp_params['object'] ) {
-		$object_data = array( 'dir' => 'members', 'component' => 'xprofile' );
+		$object_data = array( 'dir' => 'members', 'component' => 'members' );
 
 		if ( ! bp_displayed_user_id() && ! empty( $bp_params['item_id'] ) ) {
 			$needs_reset = array( 'key' => 'displayed_user', 'value' => $bp->displayed_user );
@@ -1293,15 +1362,17 @@ function bp_attachments_cover_image_ajax_upload() {
 		// Upload error response.
 		bp_attachments_json_response( false, $is_html4, array(
 			'type'    => 'upload_error',
-			'message' => sprintf( __( 'Upload Failed! Error was: %s', 'buddypress' ), $uploaded['error'] ),
+			'message' => sprintf(
+				/* translators: %s: the upload error message */
+				__( 'Upload Failed! Error was: %s', 'buddypress' ),
+				$uploaded['error']
+			),
 		) );
 	}
 
-	// Default error message.
 	$error_message = __( 'There was a problem uploading the cover image.', 'buddypress' );
 
-	// Get BuddyPress Attachments Uploads Dir datas.
-	$bp_attachments_uploads_dir = bp_attachments_uploads_dir_get();
+	$bp_attachments_uploads_dir = bp_attachments_cover_image_upload_dir();
 
 	// The BP Attachments Uploads Dir is not set, stop.
 	if ( ! $bp_attachments_uploads_dir ) {
@@ -1314,7 +1385,7 @@ function bp_attachments_cover_image_ajax_upload() {
 	$cover_subdir = $object_data['dir'] . '/' . $bp_params['item_id'] . '/cover-image';
 	$cover_dir    = trailingslashit( $bp_attachments_uploads_dir['basedir'] ) . $cover_subdir;
 
-	if ( ! is_dir( $cover_dir ) ) {
+	if ( 1 === validate_file( $cover_dir ) || ! is_dir( $cover_dir ) ) {
 		// Upload error response.
 		bp_attachments_json_response( false, $is_html4, array(
 			'type'    => 'upload_error',
@@ -1322,10 +1393,10 @@ function bp_attachments_cover_image_ajax_upload() {
 		) );
 	}
 
-	/**
+	/*
 	 * Generate the cover image so that it fit to feature's dimensions
 	 *
-	 * Unlike the Avatar, Uploading and generating the cover image is happening during
+	 * Unlike the avatar, uploading and generating the cover image is happening during
 	 * the same Ajax request, as we already instantiated the BP_Attachment_Cover_Image
 	 * class, let's use it.
 	 */
@@ -1336,17 +1407,15 @@ function bp_attachments_cover_image_ajax_upload() {
 	), $cover_image_attachment );
 
 	if ( ! $cover ) {
-		// Upload error response.
 		bp_attachments_json_response( false, $is_html4, array(
 			'type'    => 'upload_error',
 			'message' => $error_message,
 		) );
 	}
 
-	// Build the url to the file.
 	$cover_url = trailingslashit( $bp_attachments_uploads_dir['baseurl'] ) . $cover_subdir . '/' . $cover['cover_basename'];
 
-	// Init Feedback code, 1 is success.
+	// 1 is success.
 	$feedback_code = 1;
 
 	// 0 is the size warning.
@@ -1355,23 +1424,53 @@ function bp_attachments_cover_image_ajax_upload() {
 	}
 
 	// Set the name of the file.
-	$name = $_FILES['file']['name'];
+	$name       = $_FILES['file']['name'];
 	$name_parts = pathinfo( $name );
-	$name = trim( substr( $name, 0, - ( 1 + strlen( $name_parts['extension'] ) ) ) );
+	$name       = trim( substr( $name, 0, - ( 1 + strlen( $name_parts['extension'] ) ) ) );
+
+	// Set some arguments for filters.
+	$item_id   = (int) $bp_params['item_id'];
+	$component = $object_data['component'];
 
 	/**
 	 * Fires if the new cover image was successfully uploaded.
 	 *
-	 * The dynamic portion of the hook will be xprofile in case of a user's
+	 * The dynamic portion of the hook will be members in case of a user's
 	 * cover image, groups in case of a group's cover image. For instance:
-	 * Use add_action( 'xprofile_cover_image_uploaded' ) to run your specific
+	 * Use add_action( 'members_cover_image_uploaded' ) to run your specific
 	 * code once the user has set his cover image.
 	 *
 	 * @since 2.4.0
+	 * @since 3.0.0 Added $cover_url, $name, $feedback_code arguments.
 	 *
-	 * @param int $item_id Inform about the item id the cover image was set for.
+	 * @param int    $item_id       Inform about the item id the cover image was set for.
+	 * @param string $name          Filename.
+	 * @param string $cover_url     URL to the image.
+	 * @param int    $feedback_code If value not 1, an error occured.
 	 */
-	do_action( $object_data['component'] . '_cover_image_uploaded', (int) $bp_params['item_id'] );
+	do_action(
+		$component . '_cover_image_uploaded',
+		$item_id,
+		$name,
+		$cover_url,
+		$feedback_code
+	);
+
+	// Handle deprecated xProfile action.
+	if ( 'members' === $component ) {
+		/** This filter is documented in wp-includes/deprecated.php */
+		do_action_deprecated(
+			'xprofile_cover_image_uploaded',
+			array(
+				$item_id,
+				$name,
+				$cover_url,
+				$feedback_code,
+			),
+			'6.0.0',
+			'members_cover_image_deleted'
+		);
+	}
 
 	// Finally return the cover image url to the UI.
 	bp_attachments_json_response( true, $is_html4, array(
@@ -1391,56 +1490,63 @@ add_action( 'wp_ajax_bp_cover_image_upload', 'bp_attachments_cover_image_ajax_up
  *                     error message otherwise.
  */
 function bp_attachments_cover_image_ajax_delete() {
-	// Bail if not a POST action.
-	if ( 'POST' !== strtoupper( $_SERVER['REQUEST_METHOD'] ) ) {
+	if ( ! bp_is_post_request() ) {
 		wp_send_json_error();
 	}
 
-	$cover_image_data = $_POST;
-
-	if ( empty( $cover_image_data['object'] ) || empty( $cover_image_data['item_id'] ) ) {
+	if ( empty( $_POST['object'] ) || empty( $_POST['item_id'] ) || ( ! ctype_digit( $_POST['item_id'] ) && ! is_int( $_POST['item_id'] ) ) ) {
 		wp_send_json_error();
 	}
 
-	// Check the nonce.
+	$args = array(
+		'object'  => sanitize_text_field( $_POST['object'] ),
+		'item_id' => (int) $_POST['item_id'],
+	);
+
+	// Check permissions.
 	check_admin_referer( 'bp_delete_cover_image', 'nonce' );
-
-	// Capability check.
-	if ( ! bp_attachments_current_user_can( 'edit_cover_image', $cover_image_data ) ) {
+	if ( ! bp_attachments_current_user_can( 'edit_cover_image', $args ) ) {
 		wp_send_json_error();
 	}
 
 	// Set object for the user's case.
-	if ( 'user' === $cover_image_data['object'] ) {
-		$component = 'xprofile';
+	if ( 'user' === $args['object'] ) {
+		$component = 'members';
 		$dir       = 'members';
 
 	// Set it for any other cases.
 	} else {
-		$component = $cover_image_data['object'] . 's';
+		$component = $args['object'] . 's';
 		$dir       = $component;
 	}
 
 	// Handle delete.
-	if ( bp_attachments_delete_file( array( 'item_id' => $cover_image_data['item_id'], 'object_dir' => $dir, 'type' => 'cover-image' ) ) ) {
+	if ( bp_attachments_delete_file( array( 'item_id' => $args['item_id'], 'object_dir' => $dir, 'type' => 'cover-image' ) ) ) {
+		$item_id = (int) $args['item_id'];
+
 		/**
 		 * Fires if the cover image was successfully deleted.
 		 *
-		 * The dynamic portion of the hook will be xprofile in case of a user's
+		 * The dynamic portion of the hook will be members in case of a user's
 		 * cover image, groups in case of a group's cover image. For instance:
-		 * Use add_action( 'xprofile_cover_image_deleted' ) to run your specific
+		 * Use add_action( 'members_cover_image_deleted' ) to run your specific
 		 * code once the user has deleted his cover image.
 		 *
 		 * @since 2.8.0
 		 *
 		 * @param int $item_id Inform about the item id the cover image was deleted for.
 		 */
-		do_action( "{$component}_cover_image_deleted", (int) $cover_image_data['item_id'] );
+		do_action( "{$component}_cover_image_deleted", $item_id );
 
-		// Defaults no cover image.
+		// Handle deprecated xProfile action.
+		if ( 'members' === $component ) {
+			/** This filter is documented in wp-includes/deprecated.php */
+			do_action_deprecated( 'xprofile_cover_image_deleted', array( $item_id ), '6.0.0', 'members_cover_image_deleted' );
+		}
+
 		$response = array(
 			'reset_url'     => '',
-			'feedback_code' => 3 ,
+			'feedback_code' => 3,
 		);
 
 		// Get cover image settings in case there's a default header.
@@ -1451,7 +1557,6 @@ function bp_attachments_cover_image_ajax_delete() {
 			$response['reset_url'] = $cover_params['default_cover'];
 		}
 
-		// Finally send the reset url.
 		wp_send_json_success( $response );
 
 	} else {

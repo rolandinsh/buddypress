@@ -183,7 +183,7 @@ class BP_User_Query {
 			 */
 			do_action_ref_array( 'bp_pre_user_query_construct', array( &$this ) );
 
-			// Get user ids
+			// Get user ids.
 			// If the user_ids param is present, we skip the query.
 			if ( false !== $this->query_vars['user_ids'] ) {
 				$this->user_ids = wp_parse_id_list( $this->query_vars['user_ids'] );
@@ -374,7 +374,7 @@ class BP_User_Query {
 		}
 
 		// 'exclude' - User ids to exclude from the results.
-		if ( false !== $exclude ) {
+		if ( ! empty( $exclude ) ) {
 			$exclude_ids    = implode( ',', wp_parse_id_list( $exclude ) );
 			$sql['where'][] = "u.{$this->uid_name} NOT IN ({$exclude_ids})";
 		}
@@ -413,13 +413,16 @@ class BP_User_Query {
 				$search_terms_space   = '%' . $search_terms . '%';
 			}
 
-			$sql['where']['search'] = $wpdb->prepare(
-				"u.{$this->uid_name} IN ( SELECT ID FROM {$wpdb->users} WHERE ( user_login LIKE %s OR user_login LIKE %s OR user_nicename LIKE %s OR user_nicename LIKE %s ) )",
+			$matched_user_ids = $wpdb->get_col( $wpdb->prepare(
+				"SELECT ID FROM {$wpdb->users} WHERE ( user_login LIKE %s OR user_login LIKE %s OR user_nicename LIKE %s OR user_nicename LIKE %s )",
 				$search_terms_nospace,
 				$search_terms_space,
 				$search_terms_nospace,
 				$search_terms_space
-			);
+			) );
+
+			$match_in_clause = empty( $matched_user_ids) ? 'NULL' : implode( ',', $matched_user_ids );
+			$sql['where']['search'] = "u.{$this->uid_name} IN ({$match_in_clause})";
 		}
 
 		// Only use $member_type__in if $member_type is not set.
@@ -570,18 +573,12 @@ class BP_User_Query {
 
 		), $this ) );
 
-		// WP_User_Query doesn't cache the data it pulls from wp_users,
-		// and it does not give us a way to save queries by fetching
-		// only uncached users. However, BP does cache this data, so
-		// we set it here.
-		foreach ( $wp_user_query->results as $u ) {
-			wp_cache_set( 'bp_core_userdata_' . $u->ID, $u, 'bp' );
-		}
-
-		// We calculate total_users using a standalone query, except
-		// when a whitelist of user_ids is passed to the constructor.
-		// This clause covers the latter situation, and ensures that
-		// pagination works when querying by $user_ids.
+		/*
+		 * We calculate total_users using a standalone query, except
+		 * when a list of specific user_ids is passed to the constructor.
+		 * This clause covers the latter situation, and ensures that
+		 * pagination works when querying by $user_ids.
+		 */
 		if ( empty( $this->total_users ) ) {
 			$this->total_users = count( $wp_user_query->results );
 		}
@@ -689,7 +686,7 @@ class BP_User_Query {
 
 		// Set a last_activity value for each user, even if it's empty.
 		foreach ( $this->results as $user_id => $user ) {
-			$user_last_activity = isset( $last_activities[ $user_id ] ) ? $last_activities[ $user_id ]['date_recorded'] : '';
+			$user_last_activity = isset( $last_activities[ $user_id ]['date_recorded'] ) ? $last_activities[ $user_id ]['date_recorded'] : '';
 			$this->results[ $user_id ]->last_activity = $user_last_activity;
 		}
 

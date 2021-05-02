@@ -47,6 +47,38 @@ function bp_admin_setting_callback_account_deletion() {
 <?php
 }
 
+/**
+ * Form element to change the active template pack.
+ */
+function bp_admin_setting_callback_theme_package_id() {
+	$options = '';
+
+	/*
+	 * Note: This should never be empty. /bp-templates/ is the
+	 * canonical backup if no other packages exist. If there's an error here,
+	 * something else is wrong.
+	 *
+	 * See BuddyPress::register_theme_packages()
+	 */
+	foreach ( (array) buddypress()->theme_compat->packages as $id => $theme ) {
+		$options .= sprintf(
+			'<option value="%1$s" %2$s>%3$s</option>',
+			esc_attr( $id ),
+			selected( $theme->id, bp_get_theme_package_id(), false ),
+			esc_html( $theme->name )
+		);
+	}
+
+	if ( $options ) : ?>
+		<select name="_bp_theme_package_id" id="_bp_theme_package_id" aria-describedby="_bp_theme_package_description"><?php echo $options; ?></select>
+		<p id="_bp_theme_package_description" class="description"><?php esc_html_e( 'The selected Template Pack will serve all BuddyPress templates.', 'buddypress' ); ?></p>
+
+	<?php else : ?>
+		<p><?php esc_html_e( 'No template packages available.', 'buddypress' ); ?></p>
+
+	<?php endif;
+}
+
 /** Activity *******************************************************************/
 
 /**
@@ -72,7 +104,7 @@ function bp_admin_setting_callback_activity_akismet() {
 }
 
 /**
- * Allow activity comments on blog posts and forum posts.
+ * Allow activity comments on posts and comments.
  *
  * @since 1.6.0
  */
@@ -80,7 +112,7 @@ function bp_admin_setting_callback_blogforum_comments() {
 ?>
 
 	<input id="bp-disable-blogforum-comments" name="bp-disable-blogforum-comments" type="checkbox" value="1" <?php checked( !bp_disable_blogforum_comments( false ) ); ?> />
-	<label for="bp-disable-blogforum-comments"><?php _e( 'Allow activity stream commenting on blog and forum posts', 'buddypress' ); ?></label>
+	<label for="bp-disable-blogforum-comments"><?php _e( 'Allow activity stream commenting on posts and comments', 'buddypress' ); ?></label>
 
 <?php
 }
@@ -102,7 +134,7 @@ function bp_admin_setting_callback_heartbeat() {
 /**
  * Sanitization for bp-disable-blogforum-comments setting.
  *
- * In the UI, a checkbox asks whether you'd like to *enable* blog/forum activity comments. For
+ * In the UI, a checkbox asks whether you'd like to *enable* post/comment activity comments. For
  * legacy reasons, the option that we store is 1 if these comments are *disabled*. So we use this
  * function to flip the boolean before saving the intval.
  *
@@ -113,6 +145,41 @@ function bp_admin_setting_callback_heartbeat() {
  */
 function bp_admin_sanitize_callback_blogforum_comments( $value = false ) {
 	return $value ? 0 : 1;
+}
+
+/** Members *******************************************************************/
+
+/**
+ * Profile settings section description for the settings page.
+ *
+ * @since 1.6.0
+ */
+function bp_admin_setting_callback_members_section() { }
+
+/**
+ * Allow members to upload avatars field.
+ *
+ * @since 1.6.0
+ * @since 6.0.0 Setting has been moved into the Members section.
+ */
+function bp_admin_setting_callback_avatar_uploads() {
+?>
+	<input id="bp-disable-avatar-uploads" name="bp-disable-avatar-uploads" type="checkbox" value="1" <?php checked( !bp_disable_avatar_uploads( false ) ); ?> />
+	<label for="bp-disable-avatar-uploads"><?php _e( 'Allow registered members to upload avatars', 'buddypress' ); ?></label>
+<?php
+}
+
+/**
+ * Allow members to upload cover images field.
+ *
+ * @since 2.4.0
+ * @since 6.0.0 Setting has been moved into the Members section.
+ */
+function bp_admin_setting_callback_cover_image_uploads() {
+?>
+	<input id="bp-disable-cover-image-uploads" name="bp-disable-cover-image-uploads" type="checkbox" value="1" <?php checked( ! bp_disable_cover_image_uploads() ); ?> />
+	<label for="bp-disable-cover-image-uploads"><?php _e( 'Allow registered members to upload cover images', 'buddypress' ); ?></label>
+<?php
 }
 
 /** XProfile ******************************************************************/
@@ -139,33 +206,6 @@ function bp_admin_setting_callback_profile_sync() {
 <?php
 }
 
-/**
- * Allow members to upload avatars field.
- *
- * @since 1.6.0
- *
- */
-function bp_admin_setting_callback_avatar_uploads() {
-?>
-
-	<input id="bp-disable-avatar-uploads" name="bp-disable-avatar-uploads" type="checkbox" value="1" <?php checked( !bp_disable_avatar_uploads( false ) ); ?> />
-	<label for="bp-disable-avatar-uploads"><?php _e( 'Allow registered members to upload avatars', 'buddypress' ); ?></label>
-
-<?php
-}
-
-/**
- * Allow members to upload cover images field.
- *
- * @since 2.4.0
- */
-function bp_admin_setting_callback_cover_image_uploads() {
-?>
-	<input id="bp-disable-cover-image-uploads" name="bp-disable-cover-image-uploads" type="checkbox" value="1" <?php checked( ! bp_disable_cover_image_uploads() ); ?> />
-	<label for="bp-disable-cover-image-uploads"><?php _e( 'Allow registered members to upload cover images', 'buddypress' ); ?></label>
-<?php
-}
-
 /** Groups Section ************************************************************/
 
 /**
@@ -184,9 +224,9 @@ function bp_admin_setting_callback_groups_section() { }
 function bp_admin_setting_callback_group_creation() {
 ?>
 
-	<input id="bp_restrict_group_creation" name="bp_restrict_group_creation" type="checkbox"value="1" <?php checked( !bp_restrict_group_creation( false ) ); ?> />
+	<input id="bp_restrict_group_creation" name="bp_restrict_group_creation" type="checkbox" aria-describedby="bp_group_creation_description" value="1" <?php checked( !bp_restrict_group_creation( false ) ); ?> />
 	<label for="bp_restrict_group_creation"><?php _e( 'Enable group creation for all users', 'buddypress' ); ?></label>
-	<p class="description"><?php _e( 'Administrators can always create groups, regardless of this setting.', 'buddypress' ); ?></p>
+	<p class="description" id="bp_group_creation_description"><?php _e( 'Administrators can always create groups, regardless of this setting.', 'buddypress' ); ?></p>
 
 <?php
 }
@@ -215,40 +255,6 @@ function bp_admin_setting_callback_group_cover_image_uploads() {
 <?php
 }
 
-/** Forums Section ************************************************************/
-
-/**
- * Forums settings section description for the settings page.
- *
- * @since 1.6.0
- */
-function bp_admin_setting_callback_bbpress_section() { }
-
-/**
- * The bb-config.php location field.
- *
- * @since 1.6.0
- *
- */
-function bp_admin_setting_callback_bbpress_configuration() {
-
-	$config_location = bp_get_option( 'bb-config-location' );
-	$file_exists     = (bool) ( file_exists( $config_location ) || is_file( $config_location ) ); ?>
-
-	<input name="bb-config-location" type="text" id="bb-config-location" value="<?php bp_form_option( 'bb-config-location', '' ); ?>" class="medium-text" style="width: 300px;" />
-
-	<?php if ( false === $file_exists ) : ?>
-
-		<a class="button" href="<?php bp_admin_url( 'admin.php?page=bb-forums-setup&repair=1' ); ?>" title="<?php esc_attr_e( 'Attempt to save a new config file.', 'buddypress' ); ?>"><?php _e( 'Repair', 'buddypress' ) ?></a>
-		<span class="attention"><?php _e( 'File does not exist', 'buddypress' ); ?></span>
-
-	<?php endif; ?>
-
-	<p class="description"><?php _e( 'Absolute path to your bbPress configuration file.', 'buddypress' ); ?></p>
-
-<?php
-}
-
 /** Settings Page *************************************************************/
 
 /**
@@ -266,9 +272,10 @@ function bp_core_admin_settings() {
 
 	<div class="wrap">
 
-		<h1><?php _e( 'BuddyPress Settings', 'buddypress' ); ?> </h1>
+		<h1 class="wp-heading-inline"><?php esc_html_e( 'BuddyPress Settings', 'buddypress' ); ?></h1>
+		<hr class="wp-header-end">
 
-		<h2 class="nav-tab-wrapper"><?php bp_core_admin_tabs( __( 'Options', 'buddypress' ) ); ?></h2>
+		<h2 class="nav-tab-wrapper"><?php bp_core_admin_tabs( esc_html__( 'Options', 'buddypress' ) ); ?></h2>
 
 		<form action="<?php echo esc_url( $form_action ) ?>" method="post">
 

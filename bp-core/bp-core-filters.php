@@ -59,6 +59,9 @@ add_filter( 'bp_email_set_content_html', 'stripslashes', 8 );
 add_filter( 'bp_email_set_content_plaintext', 'wp_strip_all_tags', 6 );
 add_filter( 'bp_email_set_subject', 'sanitize_text_field', 6 );
 
+// Avatars.
+add_filter( 'bp_core_fetch_avatar', 'bp_core_add_loading_lazy_attribute' );
+
 /**
  * Template Compatibility.
  *
@@ -100,9 +103,6 @@ function bp_core_exclude_pages( $pages = array() ) {
 
 	if ( !empty( $bp->pages->register ) )
 		$pages[] = $bp->pages->register->id;
-
-	if ( !empty( $bp->pages->forums ) && ( !bp_is_active( 'forums' ) || ( bp_is_active( 'forums' ) && bp_forums_has_directory() && !bp_forums_is_installed_correctly() ) ) )
-		$pages[] = $bp->pages->forums->id;
 
 	/**
 	 * Filters specific pages that shouldn't show up on page listings.
@@ -352,7 +352,7 @@ add_filter( 'bp_login_redirect', 'bp_core_login_redirect', 10, 3 );
  * @param string $retval    Current email content.
  * @param string $prop      Email property to check against.
  * @param string $transform Either 'raw' or 'replace-tokens'.
- * @return string $retval Modified email content.
+ * @return string|null $retval Modified email content.
  */
 function bp_email_plaintext_entity_decode( $retval, $prop, $transform ) {
 	switch ( $prop ) {
@@ -437,7 +437,7 @@ function bp_core_filter_blog_welcome_email( $welcome_email, $blog_id, $user_id, 
 	if ( ! bp_has_custom_signup_page() )
 		return $welcome_email;
 
-	// [User Set] Replaces $password in welcome email; Represents value set by user
+	// [User Set] Replaces $password in welcome email; Represents value set by user.
 	return str_replace( $password, __( '[User Set]', 'buddypress' ), $welcome_email );
 }
 add_filter( 'update_welcome_email', 'bp_core_filter_blog_welcome_email', 10, 4 );
@@ -467,12 +467,27 @@ function bp_core_activation_signup_blog_notification( $domain, $path, $title, $u
 			'domain'            => $domain,
 			'key_blog'          => $key,
 			'path'              => $path,
-			'user-site.url'     => esc_url( "http://{$domain}{$path}" ),
+			'user-site.url'     => esc_url( set_url_scheme( "http://{$domain}{$path}" ) ),
 			'title'             => $title,
 			'user.email'        => $user_email,
 		),
 	);
-	bp_send_email( 'core-user-registration-with-blog', array( array( $user_email => $user ) ), $args );
+
+	$signups = BP_Signup::get(
+		array(
+			'user_login' => $user,
+		)
+	);
+
+	$salutation = $user;
+	if ( $signups && bp_is_active( 'xprofile' ) ) {
+		$signup = $signups['signups'][0];
+		if ( isset( $signup->meta[ 'field_' . bp_xprofile_fullname_field_id() ] ) ) {
+			$salutation = $signup->meta[ 'field_' . bp_xprofile_fullname_field_id() ];
+		}
+	}
+
+	bp_send_email( 'core-user-registration-with-blog', array( array( $user_email => $salutation ) ), $args );
 
 	// Return false to stop the original WPMU function from continuing.
 	return false;
@@ -490,7 +505,7 @@ add_filter( 'wpmu_signup_blog_notification', 'bp_core_activation_signup_blog_not
  * @param string $user_email The user's email address.
  * @param string $key        The activation key created in wpmu_signup_user().
  * @param array  $meta       By default, an empty array.
- * @return bool|string       Returns false to stop original WPMU function from continuing.
+ * @return false|string Returns false to stop original WPMU function from continuing.
  */
 function bp_core_activation_signup_user_notification( $user, $user_email, $key, $meta ) {
 	if ( is_admin() ) {
@@ -526,6 +541,13 @@ function bp_core_activation_signup_user_notification( $user, $user_email, $key, 
 		$user_id = $user_object->ID;
 	}
 
+	$salutation = $user;
+	if ( bp_is_active( 'xprofile' ) && isset( $meta[ 'field_' . bp_xprofile_fullname_field_id() ] ) ) {
+		$salutation = $meta[ 'field_' . bp_xprofile_fullname_field_id() ];
+	} elseif ( $user_id ) {
+		$salutation = bp_core_get_user_displayname( $user_id );
+	}
+
 	$args = array(
 		'tokens' => array(
 			'activate.url' => esc_url( trailingslashit( bp_get_activation_page() ) . "{$key}/" ),
@@ -534,7 +556,7 @@ function bp_core_activation_signup_user_notification( $user, $user_email, $key, 
 			'user.id'      => $user_id,
 		),
 	);
-	bp_send_email( 'core-user-registration', array( array( $user_email => $user ) ), $args );
+	bp_send_email( 'core-user-registration', array( array( $user_email => $salutation ) ), $args );
 
 	// Return false to stop the original WPMU function from continuing.
 	return false;
@@ -581,6 +603,7 @@ function bp_modify_page_title( $title = '', $sep = '&raquo;', $seplocation = 'ri
 		$bp_title_parts['site'] = $blogname;
 
 		if ( ( $paged >= 2 || $page >= 2 ) && ! is_404() && ! bp_is_single_activity() ) {
+			/* translators: %s: the page number. */
 			$bp_title_parts['page'] = sprintf( __( 'Page %s', 'buddypress' ), max( $paged, $page ) );
 		}
 	}
@@ -671,6 +694,16 @@ add_filter( 'document_title_parts', 'bp_modify_document_title_parts', 20, 1 );
  */
 function bp_setup_nav_menu_item( $menu_item ) {
 	if ( is_admin() ) {
+		if ( 'bp_nav_menu_item' === $menu_item->object ) {
+			$menu_item->type = 'custom';
+			$menu_item->url  = $menu_item->guid;
+
+			if ( ! in_array( array( 'bp-menu', 'bp-'. $menu_item->post_excerpt .'-nav' ), $menu_item->classes ) ) {
+				$menu_item->classes[] = 'bp-menu';
+				$menu_item->classes[] = 'bp-'. $menu_item->post_excerpt .'-nav';
+			}
+		}
+
 		return $menu_item;
 	}
 
@@ -792,7 +825,7 @@ add_filter( 'customize_nav_menu_available_items', 'bp_customizer_nav_menus_get_i
  *
  * @since 2.3.3
  *
- * @param array $item_types An associative array structured for the customizer.
+ * @param  array $item_types An associative array structured for the customizer.
  * @return array $item_types An associative array structured for the customizer.
  */
 function bp_customizer_nav_menus_set_item_types( $item_types = array() ) {
@@ -858,8 +891,8 @@ function bp_filter_metaid_column_name( $q ) {
  *
  * @param string $edit_link The edit link.
  * @param int    $post_id   Post ID.
- * @return bool|string Will be a boolean (false) if $post_id is 0. Will be a string (the unchanged edit link)
- *                     otherwise
+ * @return false|string Will be a boolean (false) if $post_id is 0. Will be a string (the unchanged edit link)
+ *                      otherwise
  */
 function bp_core_filter_edit_post_link( $edit_link = '', $post_id = 0 ) {
 	if ( 0 === $post_id ) {
@@ -867,6 +900,31 @@ function bp_core_filter_edit_post_link( $edit_link = '', $post_id = 0 ) {
 	}
 
 	return $edit_link;
+}
+
+/**
+ * Add 'loading="lazy"' attribute into images and iframes.
+ *
+ * @since 7.0.0
+ *
+ * @string $content Content to inject attribute into.
+ * @return string
+ */
+function bp_core_add_loading_lazy_attribute( $content = '' ) {
+	if ( false === strpos( $content, '<img ' ) && false === strpos( $content, '<iframe ' ) ) {
+		return $content;
+	}
+
+	$content = str_replace( '<img ',    '<img loading="lazy" ',    $content );
+	$content = str_replace( '<iframe ', '<iframe loading="lazy" ', $content );
+
+	// WordPress posts need their position absolute removed for lazyloading.
+	$find_pos_absolute = ' style="position: absolute; clip: rect(1px, 1px, 1px, 1px);" ';
+	if ( false !== strpos( $content, 'data-secret=' ) && false !== strpos( $content, $find_pos_absolute ) ) {
+		$content = str_replace( $find_pos_absolute, '', $content );
+	}
+
+	return $content;
 }
 
 /**
@@ -967,7 +1025,7 @@ function bp_email_add_link_color_to_template( $value, $property_name, $transform
 	}
 
 	$settings    = bp_email_get_appearance_settings();
-	$replacement = 'style="color: ' . esc_attr( $settings['highlight_color'] ) . ';';
+	$replacement = 'style="color: ' . esc_attr( $settings['link_text_color'] ) . ';';
 
 	// Find all links.
 	preg_match_all( '#<a[^>]+>#i', $value, $links, PREG_SET_ORDER );
@@ -1008,16 +1066,17 @@ function bp_email_set_default_headers( $headers, $property, $transform, $email )
 	$tokens = $email->get_tokens();
 
 	// Add 'List-Unsubscribe' header if applicable.
-	if ( ! empty( $tokens['unsubscribe'] ) && $tokens['unsubscribe'] !== site_url( 'wp-login.php' ) ) {
+	if ( ! empty( $tokens['unsubscribe'] ) && $tokens['unsubscribe'] !== wp_login_url() ) {
 		$user = get_user_by( 'email', $tokens['recipient.email'] );
 
-		$headers['List-Unsubscribe'] = sprintf(
-			'<%s>',
-			esc_url_raw( bp_email_get_unsubscribe_link( array(
-				'user_id'           => $user->ID,
-				'notification_type' => $email->get( 'type' ),
-			) ) )
-		);
+		$link = bp_email_get_unsubscribe_link( array(
+			'user_id'           => $user->ID,
+			'notification_type' => $email->get( 'type' ),
+		) );
+
+		if ( ! empty( $link ) ) {
+			$headers['List-Unsubscribe'] = sprintf( '<%s>', esc_url_raw( $link ) );
+		}
 	}
 
 	return $headers;
@@ -1037,7 +1096,8 @@ add_filter( 'bp_email_get_headers', 'bp_email_set_default_headers', 6, 4 );
  */
 function bp_email_set_default_tokens( $tokens, $property_name, $transform, $email ) {
 	$tokens['site.admin-email'] = bp_get_option( 'admin_email' );
-	$tokens['site.url']         = home_url();
+	$tokens['site.url']         = bp_get_root_domain();
+	$tokens['email.subject']    = $email->get_subject();
 
 	// These options are escaped with esc_html on the way into the database in sanitize_option().
 	$tokens['site.description'] = wp_specialchars_decode( bp_get_option( 'blogdescription' ), ENT_QUOTES );
@@ -1048,7 +1108,6 @@ function bp_email_set_default_tokens( $tokens, $property_name, $transform, $emai
 	$tokens['recipient.email']     = '';
 	$tokens['recipient.name']      = '';
 	$tokens['recipient.username']  = '';
-
 
 	// Who is the email going to?
 	$recipient = $email->get( 'to' );
@@ -1065,6 +1124,7 @@ function bp_email_set_default_tokens( $tokens, $property_name, $transform, $emai
 
 		if ( $user_obj ) {
 			$tokens['recipient.username'] = $user_obj->user_login;
+
 			if ( bp_is_active( 'settings' ) && empty( $tokens['unsubscribe'] ) ) {
 				$tokens['unsubscribe'] = esc_url( sprintf(
 					'%s%s/notifications/',
@@ -1077,13 +1137,13 @@ function bp_email_set_default_tokens( $tokens, $property_name, $transform, $emai
 
 	// Set default unsubscribe link if not passed.
 	if ( empty( $tokens['unsubscribe'] ) ) {
-		$tokens['unsubscribe'] = site_url( 'wp-login.php' );
+		$tokens['unsubscribe'] = wp_login_url();
 	}
 
 	// Email preheader.
-	$post = $email->get_post_object();
-	if ( $post ) {
-		$tokens['email.preheader'] = sanitize_text_field( get_post_meta( $post->ID, 'bp_email_preheader', true ) );
+	$preheader = $email->get_preheader();
+	if ( $preheader ) {
+		$tokens['email.preheader'] = $preheader;
 	}
 
 	return $tokens;
@@ -1132,7 +1192,7 @@ function bp_core_render_email_template( $template ) {
 
 	// Make sure we add a <title> tag so WP Customizer picks it up.
 	$template = str_replace( '<head>', '<head><title>' . esc_html_x( 'BuddyPress Emails', 'screen heading', 'buddypress' ) . '</title>', $template );
-	echo str_replace( '{{{content}}}', nl2br( get_post()->post_content ), $template );
+	echo str_replace( '{{{content}}}', wpautop( get_post()->post_content ), $template );
 
 	/*
 	 * Link colours are applied directly in the email template before sending, so we
@@ -1147,3 +1207,18 @@ function bp_core_render_email_template( $template ) {
 	return '';
 }
 add_action( 'bp_template_include', 'bp_core_render_email_template', 12 );
+
+/**
+ * Adds BuddyPress components' slugs to the WordPress Multisite subdirectory reserved names.
+ *
+ * @since 6.0.0
+ *
+ * @param array $names The WordPress Multisite subdirectory reserved names.
+ * @return array       The WordPress & BuddyPress Multisite subdirectory reserved names.
+ */
+function bp_core_components_subdirectory_reserved_names( $names = array() ) {
+	$bp_pages = (array) buddypress()->pages;
+
+	return array_merge( $names, wp_list_pluck( $bp_pages, 'slug' ) );
+}
+add_filter( 'subdirectory_reserved_names', 'bp_core_components_subdirectory_reserved_names' );

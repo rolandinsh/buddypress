@@ -45,13 +45,13 @@ function bp_blogs_get_blogs( $args = '' ) {
 
 	// Parse query arguments.
 	$r = bp_parse_args( $args, array(
-		'type'              => 'active', // 'active', 'alphabetical', 'newest', or 'random'
-		'include_blog_ids'  => false,    // Array of blog IDs to include
-		'user_id'           => false,    // Limit to blogs this user can post to
-		'search_terms'      => false,    // Limit to blogs matching these search terms
-		'per_page'          => 20,       // The number of results to return per page
-		'page'              => 1,        // The page to return if limiting per page
-		'update_meta_cache' => true      // Whether to pre-fetch blogmeta
+		'type'              => 'active', // 'active', 'alphabetical', 'newest', or 'random'.
+		'include_blog_ids'  => false,    // Array of blog IDs to include.
+		'user_id'           => false,    // Limit to blogs this user can post to.
+		'search_terms'      => false,    // Limit to blogs matching these search terms.
+		'per_page'          => 20,       // The number of results to return per page.
+		'page'              => 1,        // The page to return if limiting per page.
+		'update_meta_cache' => true      // Whether to pre-fetch blogmeta.
 	), 'blogs_get_blogs' );
 
 	// Get the blogs.
@@ -100,40 +100,40 @@ function bp_blogs_record_existing_blogs( $args = array() ) {
 
 	// Query for all sites in network.
 	$r = bp_parse_args( $args, array(
-		'offset'   => false === bp_get_option( '_bp_record_blogs_offset' ) ? 0 : bp_get_option( '_bp_record_blogs_offset' ),
+		'offset'   => (int) bp_get_option( '_bp_record_blogs_offset' ),
 		'limit'    => 50,
 		'blog_ids' => array(),
 		'site_id'  => $wpdb->siteid
 	), 'record_existing_blogs' );
 
-	// Truncate all BP blogs tables if starting fresh
+	// Truncate all BP blogs tables if starting fresh.
 	if ( empty( $r['offset'] ) && empty( $r['blog_ids'] ) ) {
 		$bp = buddypress();
 
-		// Truncate user blogs table
+		// Truncate user blogs table.
 		$truncate = $wpdb->query( "TRUNCATE {$bp->blogs->table_name}" );
 		if ( is_wp_error( $truncate ) ) {
 			return false;
 		}
 
-		// Truncate user blogmeta table
+		// Truncate user blogmeta table.
 		$truncate = $wpdb->query( "TRUNCATE {$bp->blogs->table_name_blogmeta}" );
 		if ( is_wp_error( $truncate ) ) {
 			return false;
 		}
 	}
 
-	// Multisite
+	// Multisite.
 	if ( is_multisite() ) {
 		$sql = array();
 		$sql['select'] = $wpdb->prepare( "SELECT blog_id, last_updated FROM {$wpdb->base_prefix}blogs WHERE mature = 0 AND spam = 0 AND deleted = 0 AND site_id = %d", $r['site_id'] );
 
-		// Omit root blog if large network
-		if ( wp_is_large_network( 'users' ) ) {
+		// Omit root blog if large network.
+		if ( bp_is_large_install() ) {
 			$sql['omit_root_blog'] = $wpdb->prepare( "AND blog_id != %d", bp_get_root_blog_id() );
 		}
 
-		// Filter by selected blog IDs
+		// Filter by selected blog IDs.
 		if ( ! empty( $r['blog_ids'] ) ) {
 			$in        = implode( ',', wp_parse_id_list( $r['blog_ids'] ) );
 			$sql['in'] = "AND blog_id IN ({$in})";
@@ -161,9 +161,9 @@ function bp_blogs_record_existing_blogs( $args = array() ) {
 		}
 	}
 
-	 // Bail if there are no blogs
+	 // Bail if there are no blogs.
 	 if ( empty( $blogs ) ) {
-		// Make sure we remove our offset marker
+		// Make sure we remove our offset marker.
 		if ( is_multisite() ) {
 			bp_delete_option( '_bp_record_blogs_offset' );
 		}
@@ -175,7 +175,7 @@ function bp_blogs_record_existing_blogs( $args = array() ) {
 	foreach ( (array) $blogs as $blog ) {
 
 		// Ensure that the cache is clear after the table TRUNCATE above.
-		wp_cache_delete( $blog->blog_id, 'blog_meta' );
+		wp_cache_delete( $blog->blog_id, 'bp_blog_meta' );
 
 		// Get all users.
 		$users = get_users( array(
@@ -192,24 +192,24 @@ function bp_blogs_record_existing_blogs( $args = array() ) {
 		foreach ( (array) $users as $user_id ) {
 			bp_blogs_add_user_to_blog( $user_id, false, $blog->blog_id );
 
-			// Clear cache
+			// Clear cache.
 			bp_blogs_clear_blog_object_cache( $blog->blog_id, $user_id );
 		}
 
-		// Update blog last activity timestamp
+		// Update blog last activity timestamp.
 		if ( ! empty( $blog->last_updated ) && false !== strtotime( $blog->last_updated ) ) {
 			bp_blogs_update_blogmeta( $blog->blog_id, 'last_activity', $blog->last_updated );
 		}
 	}
 
-	// See if we need to do this again
+	// See if we need to do this again.
 	if ( is_multisite() && empty( $r['blog_ids'] ) ) {
 		$sql['offset'] = $wpdb->prepare( " OFFSET %d", $r['limit'] + $r['offset'] );
 
-		// Check if there are more blogs to record
+		// Check if there are more blogs to record.
 		$blog_ids = $wpdb->get_results( implode( ' ', $sql ) );
 
-		// We have more blogs; record offset and re-run function
+		// We have more blogs; record offset and re-run function.
 		if ( ! empty( $blog_ids  ) ) {
 			bp_update_option( '_bp_record_blogs_offset', $r['limit'] + $r['offset'] );
 			bp_blogs_record_existing_blogs( array(
@@ -222,7 +222,7 @@ function bp_blogs_record_existing_blogs( $args = array() ) {
 			// Bail since we have more blogs to record.
 			return;
 
-		// No more blogs; delete offset marker
+		// No more blogs; delete offset marker.
 		} else {
 			bp_delete_option( '_bp_record_blogs_offset' );
 		}
@@ -341,7 +341,7 @@ function bp_blogs_is_blog_trackable( $blog_id, $user_id = 0 ) {
  * @param int  $user_id     ID of the user for whom the blog is being recorded.
  * @param bool $no_activity Optional. Whether to skip recording an activity
  *                          item about this blog creation. Default: false.
- * @return bool|null Returns false on failure.
+ * @return false|null Returns false on failure.
  */
 function bp_blogs_record_blog( $blog_id, $user_id, $no_activity = false ) {
 
@@ -362,6 +362,7 @@ function bp_blogs_record_blog( $blog_id, $user_id, $no_activity = false ) {
 	$description     = get_blog_option( $blog_id, 'blogdescription' );
 	$close_old_posts = get_blog_option( $blog_id, 'close_comments_for_old_posts' );
 	$close_days_old  = get_blog_option( $blog_id, 'close_comments_days_old' );
+	$moderation      = get_blog_option( $blog_id, 'comment_moderation' );
 
 	$thread_depth = get_blog_option( $blog_id, 'thread_comments' );
 	if ( ! empty( $thread_depth ) ) {
@@ -384,6 +385,7 @@ function bp_blogs_record_blog( $blog_id, $user_id, $no_activity = false ) {
 	bp_blogs_update_blogmeta( $recorded_blog->blog_id, 'close_comments_for_old_posts', $close_old_posts );
 	bp_blogs_update_blogmeta( $recorded_blog->blog_id, 'close_comments_days_old', $close_days_old );
 	bp_blogs_update_blogmeta( $recorded_blog->blog_id, 'thread_comments_depth', $thread_depth );
+	bp_blogs_update_blogmeta( $recorded_blog->blog_id, 'comment_moderation', $moderation );
 
 	$is_private = !empty( $_POST['blog_public'] ) && (int) $_POST['blog_public'] ? false : true;
 
@@ -409,7 +411,7 @@ function bp_blogs_record_blog( $blog_id, $user_id, $no_activity = false ) {
 	 */
 	do_action_ref_array( 'bp_blogs_new_blog', array( &$recorded_blog, $is_private, $is_recorded, $no_activity ) );
 }
-add_action( 'wpmu_new_blog', 'bp_blogs_record_blog', 10, 2 );
+add_action( 'bp_insert_site', 'bp_blogs_record_blog', 10, 2 );
 
 /**
  * Update blog name in BuddyPress blogmeta table.
@@ -526,6 +528,19 @@ function bp_blogs_update_option_thread_comments_depth( $oldvalue, $newvalue ) {
 add_action( 'update_option_thread_comments_depth', 'bp_blogs_update_option_thread_comments_depth', 10, 2 );
 
 /**
+ * When updating comment moderation, mirror value in blogmeta table.
+ *
+ * @since 3.0.0
+ *
+ * @param string $oldvalue Value before save. Passed by do_action() but unused here.
+ * @param string $newvalue Value to change meta to.
+ */
+function bp_blogs_update_option_comment_moderation( $oldvalue, $newvalue ) {
+	bp_blogs_update_blogmeta( $GLOBALS['wpdb']->blogid, 'comment_moderation', $newvalue );
+}
+add_action( 'update_option_comment_moderation', 'bp_blogs_update_option_comment_moderation', 10, 2 );
+
+/**
  * Syncs site icon URLs to blogmeta.
  *
  * @since 2.7.0
@@ -534,13 +549,15 @@ add_action( 'update_option_thread_comments_depth', 'bp_blogs_update_option_threa
  * @param int|string $new_value New value
  */
 function bp_blogs_update_option_site_icon( $old_value, $new_value ) {
+	$blog_id = get_current_blog_id();
+
 	if ( 0 === $new_value ) {
-		bp_blogs_update_blogmeta( get_current_blog_id(), 'site_icon_url_thumb', 0 );
-		bp_blogs_update_blogmeta( get_current_blog_id(), 'site_icon_url_full',  0 );
+		bp_blogs_update_blogmeta( $blog_id, 'site_icon_url_thumb', 0 );
+		bp_blogs_update_blogmeta( $blog_id, 'site_icon_url_full',  0 );
 	} else {
 		// Save site icon URL as blogmeta.
-		bp_blogs_update_blogmeta( get_current_blog_id(), 'site_icon_url_thumb', get_site_icon_url( bp_core_avatar_thumb_width() ) );
-		bp_blogs_update_blogmeta( get_current_blog_id(), 'site_icon_url_full',  get_site_icon_url( bp_core_avatar_full_width()  ) );
+		bp_blogs_update_blogmeta( $blog_id, 'site_icon_url_thumb', bp_blogs_get_site_icon_url( $blog_id, bp_core_avatar_thumb_width() ) );
+		bp_blogs_update_blogmeta( $blog_id, 'site_icon_url_full',  bp_blogs_get_site_icon_url( $blog_id, bp_core_avatar_full_width()  ) );
 	}
 }
 add_action( 'update_option_site_icon', 'bp_blogs_update_option_site_icon', 10, 2 );
@@ -548,8 +565,9 @@ add_action( 'update_option_site_icon', 'bp_blogs_update_option_site_icon', 10, 2
 /**
  * Deletes the 'url' blogmeta for a site.
  *
- * Hooked to 'refresh_blog_details', which is notably used when editing a site
- * under "Network Admin > Sites".
+ * Fires when a site's details are updated, which generally happens when
+ * editing a site under "Network Admin > Sites". Prior to WP 4.9, the
+ * correct hook was 'refresh_blog_details'; afterward, 'clean_site_cache'.
  *
  * @since 2.3.0
  *
@@ -558,7 +576,12 @@ add_action( 'update_option_site_icon', 'bp_blogs_update_option_site_icon', 10, 2
 function bp_blogs_delete_url_blogmeta( $site_id = 0 ) {
 	bp_blogs_delete_blogmeta( (int) $site_id, 'url' );
 }
-add_action( 'refresh_blog_details', 'bp_blogs_delete_url_blogmeta' );
+
+if ( bp_is_running_wp( '4.9.0' ) ) {
+	add_action( 'clean_site_cache', 'bp_blogs_delete_url_blogmeta' );
+} else {
+	add_action( 'refresh_blog_details', 'bp_blogs_delete_url_blogmeta' );
+}
 
 /**
  * Record activity metadata about a published blog post.
@@ -641,6 +664,7 @@ function bp_blogs_update_post_activity_meta( $post, $activity, $activity_post_ob
 				$args['filter'] = array(
 					'object'       => $activity_post_object->comments_tracking->component_id,
 					'action'       => $activity_post_object->comments_tracking->action_id,
+					'primary_id'   => get_current_blog_id(),
 					'secondary_id' => implode( ',', $comment_ids ),
 				);
 
@@ -694,7 +718,7 @@ add_action( 'bp_activity_post_type_updated', 'bp_blogs_update_post_activity_meta
  * @param  WP_Comment|null $comment              The comment object.
  * @param  array           $activity_args        Array of activity arguments.
  * @param  object|null     $activity_post_object The post type tracking args object.
- * @return int|bool Returns false if no activity, the activity id otherwise.
+ * @return WP_Error|bool|int Returns false if no activity, the activity id otherwise.
  */
 function bp_blogs_comment_sync_activity_comment( &$activity_id, $comment = null, $activity_args = array(), $activity_post_object = null ) {
 	if ( empty( $activity_args ) || empty( $comment->post->ID ) || empty( $activity_post_object->comment_action_id ) ) {
@@ -704,14 +728,14 @@ function bp_blogs_comment_sync_activity_comment( &$activity_id, $comment = null,
 	// Set the current blog id.
 	$blog_id = get_current_blog_id();
 
-	// These activity metadatas are used to build the new_blog_comment action string
+	// These activity metadatas are used to build the new_blog_comment action string.
 	if ( ! empty( $activity_id ) && ! empty( $activity_args['item_id'] ) && 'new_blog_comment' === $activity_post_object->comment_action_id ) {
-		// add some post info in activity meta
+		// Add some post info in activity meta.
 		bp_activity_update_meta( $activity_id, 'post_title', $comment->post->post_title );
 		bp_activity_update_meta( $activity_id, 'post_url',   esc_url_raw( add_query_arg( 'p', $comment->post->ID, home_url( '/' ) ) ) );
 	}
 
-	// Sync comment - activity comment
+	// Sync comment - activity comment.
 	if ( ! bp_disable_blogforum_comments() ) {
 
 		if ( ! empty( $_REQUEST['action'] ) ) {
@@ -727,7 +751,7 @@ function bp_blogs_comment_sync_activity_comment( &$activity_id, $comment = null,
 		}
 
 		if ( isset( $activity_post_object->action_id ) && isset( $activity_post_object->component_id ) ) {
-			// find the parent 'new_post_type' activity entry
+			// Find the parent 'new_post_type' activity entry.
 			$parent_activity_id = bp_activity_get_activity_id( array(
 				'component'         => $activity_post_object->component_id,
 				'type'              => $activity_post_object->action_id,
@@ -741,20 +765,20 @@ function bp_blogs_comment_sync_activity_comment( &$activity_id, $comment = null,
 			}
 		}
 
-		// we found the parent activity entry
-		// so let's go ahead and reconfigure some activity args
+		// We found the parent activity entry
+		// so let's go ahead and reconfigure some activity args.
 		if ( ! empty( $parent_activity_id ) ) {
-			// set the parent activity entry ID
+			// Set the parent activity entry ID.
 			$activity_args['activity_id'] = $parent_activity_id;
 
-			// now see if the WP parent comment has a BP activity ID
+			// Now see if the WP parent comment has a BP activity ID.
 			$comment_parent = 0;
 			if ( ! empty( $comment->comment_parent ) ) {
 				$comment_parent = get_comment_meta( $comment->comment_parent, 'bp_activity_comment_id', true );
 			}
 
 			// WP parent comment does not have a BP activity ID
-			// so set to 'new_' . post_type activity ID
+			// so set to 'new_' . post_type activity ID.
 			if ( empty( $comment_parent ) ) {
 				$comment_parent = $parent_activity_id;
 			}
@@ -762,24 +786,24 @@ function bp_blogs_comment_sync_activity_comment( &$activity_id, $comment = null,
 			$activity_args['parent_id']         = $comment_parent;
 			$activity_args['skip_notification'] = true;
 
-		// could not find corresponding parent activity entry
-		// so wipe out $args array
+		// Could not find corresponding parent activity entry
+		// so wipe out $args array.
 		} else {
 			$activity_args = array();
 		}
 
-		// Record in activity streams
+		// Record in activity streams.
 		if ( ! empty( $activity_args ) ) {
 			$activity_id = bp_activity_new_comment( $activity_args );
 
 			if ( empty( $activity_args['id'] ) ) {
-				// The activity metadata to inform about the corresponding comment ID
+				// The activity metadata to inform about the corresponding comment ID.
 				bp_activity_update_meta( $activity_id, "bp_blogs_{$comment->post->post_type}_comment_id", $comment->comment_ID );
 
-				// The comment metadata to inform about the corresponding activity ID
+				// The comment metadata to inform about the corresponding activity ID.
 				add_comment_meta( $comment->comment_ID, 'bp_activity_comment_id', $activity_id );
 
-				// These activity metadatas are used to build the new_blog_comment action string
+				// These activity metadatas are used to build the new_blog_comment action string.
 				if ( 'new_blog_comment' === $activity_post_object->comment_action_id ) {
 					bp_activity_update_meta( $activity_id, 'post_title', $comment->post->post_title );
 					bp_activity_update_meta( $activity_id, 'post_url', esc_url_raw( add_query_arg( 'p', $comment->post->ID, home_url( '/' ) ) ) );
@@ -834,7 +858,7 @@ add_action( 'bp_activity_post_type_comment', 'bp_blogs_comment_sync_activity_com
  * @param int         $user_id The ID of the user.
  * @param string|bool $role    User's WordPress role for this blog ID.
  * @param int         $blog_id Blog ID user is being added to.
- * @return bool|null False on failure.
+ * @return false|null False on failure.
  */
 function bp_blogs_add_user_to_blog( $user_id, $role = false, $blog_id = 0 ) {
 	global $wpdb;
@@ -972,7 +996,7 @@ function bp_blogs_remove_blog( $blog_id ) {
 	 */
 	do_action( 'bp_blogs_remove_blog', $blog_id );
 }
-add_action( 'delete_blog', 'bp_blogs_remove_blog' );
+add_action( 'bp_delete_site', 'bp_blogs_remove_blog' );
 
 /**
  * Remove a blog from the tracker for a specific user.
@@ -1032,32 +1056,32 @@ function bp_blogs_post_type_remove_comment( $deleted, $comment_id, $activity_pos
 		 * child post comments and associated activity comments.
 		 */
 		if ( ! empty( $activity_id ) ) {
-			// fetch the activity comments for the activity item
+			// Fetch the activity comments for the activity item.
 			$activity = bp_activity_get( array(
 				'in'               => $activity_id,
 				'display_comments' => 'stream',
 				'spam'             => 'all',
 			) );
 
-			// get all activity comment IDs for the pending deleted item
+			// Get all activity comment IDs for the pending deleted item.
 			if ( ! empty( $activity['activities'] ) ) {
 				$activity_ids   = bp_activity_recurse_comments_activity_ids( $activity );
 				$activity_ids[] = $activity_id;
 
-				// delete activity items
+				// Delete activity items.
 				foreach ( $activity_ids as $activity_id ) {
 					bp_activity_delete( array(
 						'id' => $activity_id
 					) );
 				}
 
-				// remove associated blog comments
+				// Remove associated blog comments.
 				bp_blogs_remove_associated_blog_comments( $activity_ids );
 
-				// rebuild activity comment tree
+				// Rebuild activity comment tree.
 				BP_Activity_Activity::rebuild_activity_comment_tree( $activity['activities'][0]->item_id );
 
-				// Set the result
+				// Set the result.
 				$deleted = true;
 			}
 		}
@@ -1196,7 +1220,7 @@ function bp_blogs_remove_data_for_blog( $blog_id ) {
 	 */
 	do_action( 'bp_blogs_remove_data_for_blog', $blog_id );
 }
-add_action( 'delete_blog', 'bp_blogs_remove_data_for_blog', 1 );
+add_action( 'bp_delete_site', 'bp_blogs_remove_data_for_blog', 1 );
 
 /**
  * Get all of a user's blogs, as tracked by BuddyPress.
@@ -1281,20 +1305,27 @@ function bp_blogs_delete_blogmeta( $blog_id, $meta_key = false, $meta_value = fa
 
 	// Legacy - if no meta_key is passed, delete all for the blog_id.
 	if ( empty( $meta_key ) ) {
-		$keys = $wpdb->get_col( $wpdb->prepare( "SELECT meta_key FROM {$wpdb->blogmeta} WHERE blog_id = %d", $blog_id ) );
+		$table_name = buddypress()->blogs->table_name_blogmeta;
+		$sql        = "SELECT meta_key FROM {$table_name} WHERE blog_id = %d";
+		$query      = $wpdb->prepare( $sql, $blog_id );
+		$keys       = $wpdb->get_col( $query );
+
+		// With no meta_key, ignore $delete_all.
 		$delete_all = false;
 	} else {
 		$keys = array( $meta_key );
 	}
 
 	add_filter( 'query', 'bp_filter_metaid_column_name' );
+	add_filter( 'sanitize_key', 'bp_blogs_filter_meta_column_name' );
 
 	$retval = false;
 	foreach ( $keys as $key ) {
-		$retval = delete_metadata( 'blog', $blog_id, $key, $meta_value, $delete_all );
+		$retval = delete_metadata( 'bp_blog', $blog_id, $key, $meta_value, $delete_all );
 	}
 
 	remove_filter( 'query', 'bp_filter_metaid_column_name' );
+	remove_filter( 'sanitize_key', 'bp_blogs_filter_meta_column_name' );
 
 	return $retval;
 }
@@ -1317,7 +1348,9 @@ function bp_blogs_delete_blogmeta( $blog_id, $meta_key = false, $meta_value = fa
  */
 function bp_blogs_get_blogmeta( $blog_id, $meta_key = '', $single = true ) {
 	add_filter( 'query', 'bp_filter_metaid_column_name' );
-	$retval = get_metadata( 'blog', $blog_id, $meta_key, $single );
+	add_filter( 'sanitize_key', 'bp_blogs_filter_meta_column_name' );
+	$retval = get_metadata( 'bp_blog', $blog_id, $meta_key, $single );
+	remove_filter( 'sanitize_key', 'bp_blogs_filter_meta_column_name' );
 	remove_filter( 'query', 'bp_filter_metaid_column_name' );
 
 	return $retval;
@@ -1340,7 +1373,9 @@ function bp_blogs_get_blogmeta( $blog_id, $meta_key = '', $single = true ) {
  */
 function bp_blogs_update_blogmeta( $blog_id, $meta_key, $meta_value, $prev_value = '' ) {
 	add_filter( 'query', 'bp_filter_metaid_column_name' );
-	$retval = update_metadata( 'blog', $blog_id, $meta_key, $meta_value, $prev_value );
+	add_filter( 'sanitize_key', 'bp_blogs_filter_meta_column_name' );
+	$retval = update_metadata( 'bp_blog', $blog_id, $meta_key, $meta_value, $prev_value );
+	remove_filter( 'sanitize_key', 'bp_blogs_filter_meta_column_name' );
 	remove_filter( 'query', 'bp_filter_metaid_column_name' );
 
 	return $retval;
@@ -1361,7 +1396,9 @@ function bp_blogs_update_blogmeta( $blog_id, $meta_key, $meta_value, $prev_value
  */
 function bp_blogs_add_blogmeta( $blog_id, $meta_key, $meta_value, $unique = false ) {
 	add_filter( 'query', 'bp_filter_metaid_column_name' );
-	$retval = add_metadata( 'blog', $blog_id, $meta_key, $meta_value, $unique );
+	add_filter( 'sanitize_key', 'bp_blogs_filter_meta_column_name' );
+	$retval = add_metadata( 'bp_blog', $blog_id, $meta_key, $meta_value, $unique );
+	remove_filter( 'sanitize_key', 'bp_blogs_filter_meta_column_name' );
 	remove_filter( 'query', 'bp_filter_metaid_column_name' );
 
 	return $retval;
@@ -1398,8 +1435,23 @@ function bp_blogs_remove_data( $user_id ) {
 	do_action( 'bp_blogs_remove_data', $user_id );
 }
 add_action( 'wpmu_delete_user',  'bp_blogs_remove_data' );
-add_action( 'delete_user',       'bp_blogs_remove_data' );
 add_action( 'bp_make_spam_user', 'bp_blogs_remove_data' );
+
+/**
+ * Deletes user XProfile data on the 'delete_user' hook.
+ *
+ * @since 6.0.0
+ *
+ * @param int $user_id The ID of the deleted user.
+ */
+function bp_blogs_remove_data_on_delete_user( $user_id ) {
+	if ( ! bp_remove_user_data_on_delete_user_hook( 'blogs', $user_id ) ) {
+		return;
+	}
+
+	bp_blogs_remove_data( $user_id );
+}
+add_action( 'delete_user', 'bp_blogs_remove_data_on_delete_user' );
 
 /**
  * Restore all blog associations for a given user.
@@ -1426,3 +1478,139 @@ function bp_blogs_restore_data( $user_id = 0 ) {
 	}
 }
 add_action( 'bp_make_ham_user', 'bp_blogs_restore_data', 10, 1 );
+
+/**
+ * Checks whether blog creation is enabled.
+ *
+ * Returns true when blog creation is enabled for logged-in users only, or
+ * when it's enabled for new registrations.
+ *
+ * @since 1.0.0
+ * @since 7.0.0 The function has been moved into `bp-blogs/bp-blogs-functions.php`.
+ *
+ * @return bool True if blog registration is enabled.
+ */
+function bp_blog_signup_enabled() {
+	$bp            = buddypress();
+	$retval        = true;
+	$active_signup = 'all';
+
+	if ( isset( $bp->site_options['registration'] ) ) {
+		$active_signup = $bp->site_options['registration'];
+	}
+
+	/**
+	 * Filters whether or not blog creation is enabled.
+	 *
+	 * Return "all", "none", "blog" or "user".
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $active_signup Value of the registration site option creation status.
+	 */
+	$active_signup = apply_filters( 'wpmu_active_signup', $active_signup );
+
+	if ( 'none' === $active_signup || 'user' === $active_signup ) {
+		$retval = false;
+	}
+
+	return $retval;
+}
+
+/**
+ * Returns the Blog signup's submitted vars.
+ *
+ * @since 7.0.0
+ *
+ * @return array An associative array containing the Blog signup's submitted vars.
+ */
+function bp_blogs_get_signup_form_submitted_vars() {
+	$exprected_vars = array(
+		'blogname'    => '',
+		'blog_title'  => '',
+		'blog_public' => 0,
+	);
+
+	$submitted_vars = wp_parse_args( $_POST, $exprected_vars );
+
+	return array_map( 'wp_unslash', array_intersect_key( $submitted_vars, $exprected_vars ) );
+}
+
+/**
+ * Validate a blog creation submission.
+ *
+ * Essentially, a wrapper for {@link wpmu_validate_blog_signup()}.
+ *
+ * @since 1.0.0
+ * @since 7.0.0 Add the blog_name and blog_title parameters.
+ *              The function has been moved into `bp-blogs/bp-blogs-functions.php`.
+ *
+ * @return array Contains the new site data and error messages.
+ */
+function bp_blogs_validate_blog_form( $blog_name = '', $blog_title = '' ) {
+	$user = '';
+
+	if ( is_user_logged_in() ) {
+		$user = wp_get_current_user();
+	}
+
+	if ( ! $blog_name && ! $blog_title ) {
+		$submitted_vars = bp_blogs_get_signup_form_submitted_vars();
+
+		if ( array_filter( $submitted_vars ) ) {
+			$blog_name  = $submitted_vars['blogname'];
+			$blog_title = $submitted_vars['blog_title'];
+		}
+	}
+
+	return wpmu_validate_blog_signup( $blog_name, $blog_title, $user );
+}
+
+/**
+ * Gets the site icon URL even when BuddyPress is not network activated.
+ *
+ * @since 7.0.0
+ *
+ * @param integer $blog_id The ID of the blog to get the site icon URL for.
+ * @param integer $size    The size of the site icon.
+ * @return string          The site icon URL
+ */
+function bp_blogs_get_site_icon_url( $blog_id = 0, $size = 512 ) {
+	if ( is_multisite() && ! bp_is_network_activated() && ! bp_is_root_blog( $blog_id ) ) {
+		$switched_blog = false;
+		$url           = '';
+
+		if ( $blog_id && get_current_blog_id() !== (int) $blog_id ) {
+			switch_to_blog( $blog_id );
+			$switched_blog = true;
+		}
+
+		$site_icon_id = get_option( 'site_icon' );
+
+		if ( $site_icon_id ) {
+			$site_icon_data = wp_get_attachment_metadata( $site_icon_id );
+			$sizes          = wp_list_pluck( $site_icon_data['sizes'], 'width' );
+
+			sort( $sizes );
+			$closest = 'full';
+
+			foreach ( $sizes as $width ) {
+				$closest = array( $width, $width );
+
+				if ( (int) $size < (int) $width ) {
+					break;
+				}
+			}
+
+			$url = wp_get_attachment_image_url( $site_icon_id, $closest );
+		}
+
+		if ( $switched_blog ) {
+			restore_current_blog();
+		}
+
+		return $url;
+	}
+
+	return get_site_icon_url( $size, '', $blog_id );
+}

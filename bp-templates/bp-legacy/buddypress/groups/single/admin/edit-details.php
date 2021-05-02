@@ -4,6 +4,7 @@
  *
  * @package BuddyPress
  * @subpackage bp-legacy
+ * @version 3.0.0
  */
 
 ?>
@@ -20,7 +21,7 @@
 do_action( 'bp_before_group_details_admin' ); ?>
 
 <label for="group-name"><?php _e( 'Group Name (required)', 'buddypress' ); ?></label>
-<input type="text" name="group-name" id="group-name" value="<?php bp_group_name(); ?>" aria-required="true" />
+<input type="text" name="group-name" id="group-name" value="<?php echo esc_attr( bp_get_group_name() ); ?>" aria-required="true" />
 
 <label for="group-desc"><?php _e( 'Group Description (required)', 'buddypress' ); ?></label>
 <textarea name="group-desc" id="group-desc" aria-required="true"><?php bp_group_description_editable(); ?></textarea>
@@ -50,4 +51,4 @@ do_action( 'groups_custom_group_fields_editable' ); ?>
 do_action( 'bp_after_group_details_admin' ); ?>
 
 <p><input type="submit" value="<?php esc_attr_e( 'Save Changes', 'buddypress' ); ?>" id="save" name="save" /></p>
-<?php wp_nonce_field( 'groups_edit_group_details' ); ?>
+<?php wp_nonce_field( 'groups_edit_group_details' );

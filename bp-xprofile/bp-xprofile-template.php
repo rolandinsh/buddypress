@@ -21,14 +21,19 @@ defined( 'ABSPATH' ) || exit;
  * @param array|string $args {
  *     Array of arguments. See BP_XProfile_Group::get() for full description. Those arguments whose defaults differ
  *     from that method are described here:
+ *     @type int          $user_id                Default: ID of the displayed user.
  *     @type string|array $member_type            Default: 'any'.
+ *     @type int|bool     $profile_group_id       Default: false.
  *     @type bool         $hide_empty_groups      Default: true.
  *     @type bool         $hide_empty_fields      Defaults to true on the Dashboard, on a user's Edit Profile page,
  *                                                or during registration. Otherwise false.
- *     @type bool         $fetch_visibility_level Defaults to true when an admin is viewing a profile, or when a user is
- *                                                viewing her own profile, or during registration. Otherwise false.
  *     @type bool         $fetch_fields           Default: true.
  *     @type bool         $fetch_field_data       Default: true.
+ *     @type bool         $fetch_visibility_level Defaults to true when an admin is viewing a profile, or when a user is
+ *                                                viewing her own profile, or during registration. Otherwise false.
+ *     @type int|bool     $exclude_groups         Default: false.
+ *     @type int|bool     $exclude_fields         Default: false
+ *     @type bool         $update_meta_cache      Default: true.
  * }
  *
  * @return bool
@@ -120,7 +125,7 @@ function bp_profile_group_has_fields() {
  * @since 1.0.0
  *
  * @param mixed $class Extra classes to append to class attribute.
- *                     Pass mutiple class names as an array or
+ *                     Pass multiple class names as an array or
  *                     space-delimited string.
  */
 function bp_field_css_class( $class = false ) {
@@ -588,27 +593,22 @@ function bp_the_profile_field_edit_value() {
 	function bp_get_the_profile_field_edit_value() {
 		global $field;
 
-		/**
-		 * Check to see if the posted value is different, if it is re-display this
-		 * value as long as it's not empty and a required field.
-		 */
+		// Make sure field data object exists.
 		if ( ! isset( $field->data ) ) {
 			$field->data = new stdClass;
 		}
 
+		// Default to empty value.
 		if ( ! isset( $field->data->value ) ) {
 			$field->data->value = '';
 		}
 
-		if ( isset( $_POST['field_' . $field->id] ) && $field->data->value != $_POST['field_' . $field->id] ) {
-			if ( ! empty( $_POST['field_' . $field->id] ) ) {
-				$field->data->value = $_POST['field_' . $field->id];
-			} else {
-				$field->data->value = '';
-			}
-		}
+		// Was a new value posted? If so, use it instead.
+		if ( isset( $_POST['field_' . $field->id] ) ) {
 
-		$field_value = isset( $field->data->value ) ? bp_unserialize_profile_field( $field->data->value ) : '';
+			// This is sanitized via the filter below (based on the field type).
+			$field->data->value = $_POST['field_' . $field->id];
+		}
 
 		/**
 		 * Filters the XProfile field edit value.
@@ -619,7 +619,7 @@ function bp_the_profile_field_edit_value() {
 		 * @param string $type        Type for the profile field.
 		 * @param int    $id          ID for the profile field.
 		 */
-		return apply_filters( 'bp_get_the_profile_field_edit_value', $field_value, $field->type, $field->id );
+		return apply_filters( 'bp_get_the_profile_field_edit_value', $field->data->value, $field->type, $field->id );
 	}
 
 /**
@@ -690,7 +690,7 @@ function bp_the_profile_field_input_name() {
 }
 
 	/**
-	 * Retursn the XProfile field input name.
+	 * Returns the XProfile field input name.
 	 *
 	 * @since 1.1.0
 	 *
@@ -767,7 +767,7 @@ function bp_the_profile_field_options( $args = array() ) {
 		 * However, we have to make sure that all data originally in $field gets merged back in, after reinstantiation.
 		 */
 		if ( ! method_exists( $field, 'get_children' ) ) {
-			$field_obj = xprofile_get_field( $field->id );
+			$field_obj = xprofile_get_field( $field->id, null, false );
 
 			foreach ( $field as $field_prop => $field_prop_value ) {
 				if ( ! isset( $field_obj->{$field_prop} ) ) {
@@ -904,16 +904,17 @@ function bp_the_profile_field_visibility_level_label() {
 	}
 
 /**
- * Return unserialized profile field data.
+ * Return unserialized profile field data, and combine any array items into a
+ * comma-separated string.
  *
  * @since 1.0.0
  *
  * @param string $value Content to maybe unserialize.
- * @return mixed|string
+ * @return string
  */
 function bp_unserialize_profile_field( $value ) {
 	if ( is_serialized($value) ) {
-		$field_value = maybe_unserialize($value);
+		$field_value = @unserialize($value);
 		$field_value = implode( ', ', $field_value );
 		return $field_value;
 	}
@@ -1087,7 +1088,7 @@ function bp_get_profile_group_tabs() {
  *
  * @param bool $deprecated Deprecated boolean parameter.
  *
- * @return string|mixed
+ * @return string|null
  */
 function bp_profile_group_name( $deprecated = true ) {
 	if ( ! $deprecated ) {
@@ -1163,7 +1164,11 @@ function bp_profile_last_updated() {
 			 *
 			 * @param string $value Formatted last updated indicator string.
 			 */
-			return apply_filters( 'bp_get_profile_last_updated', sprintf( __( 'Profile updated %s', 'buddypress' ), bp_core_time_since( strtotime( $last_updated ) ) ) );
+			return apply_filters(
+				'bp_get_profile_last_updated',
+				/* translators: %s: last activity timestamp (e.g. "active 1 hour ago") */
+				sprintf( __( 'Profile updated %s', 'buddypress' ), bp_core_time_since( strtotime( $last_updated ) ) )
+			);
 		}
 
 		return false;
@@ -1201,34 +1206,6 @@ function bp_current_profile_group_id() {
 		 * @param int $profile_group_id Current profile group ID.
 		 */
 		return (int) apply_filters( 'bp_get_current_profile_group_id', $profile_group_id );
-	}
-
-/**
- * Render an avatar delete link.
- *
- * @since 1.1.0
- */
-function bp_avatar_delete_link() {
-	echo bp_get_avatar_delete_link();
-}
-
-	/**
-	 * Return an avatar delete link.
-	 *
-	 * @since 1.1.0
-	 *
-	 * @return string
-	 */
-	function bp_get_avatar_delete_link() {
-
-		/**
-		 * Filters the link used for deleting an avatar.
-		 *
-		 * @since 1.1.0
-		 *
-		 * @param string $value Nonced URL used for deleting an avatar.
-		 */
-		return apply_filters( 'bp_get_avatar_delete_link', wp_nonce_url( bp_displayed_user_domain() . bp_get_profile_slug() . '/change-avatar/delete-avatar/', 'bp_delete_avatar_link' ) );
 	}
 
 /**
@@ -1282,10 +1259,10 @@ function bp_profile_visibility_radio_buttons( $args = '' ) {
 		// Parse optional arguments.
 		$r = bp_parse_args( $args, array(
 			'field_id'     => bp_get_the_profile_field_id(),
-			'before'       => '<ul class="radio">',
-			'after'        => '</ul>',
-			'before_radio' => '<li class="%s">',
-			'after_radio'  => '</li>',
+			'before'       => '<div class="radio">',
+			'after'        => '</div>',
+			'before_radio' => '',
+			'after_radio'  => '',
 			'class'        => 'bp-xprofile-visibility'
 		), 'xprofile_visibility_radio_buttons' );
 

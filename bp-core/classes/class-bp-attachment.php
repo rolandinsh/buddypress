@@ -77,7 +77,7 @@ abstract class BP_Attachment {
 
 		/**
 		 * Max file size defaults to php ini settings or, in the case of
-		 * a multisite config, the root site fileupload_maxk option
+		 * a multisite config, the root site fileupload_maxk option.
 		 */
 		$this->default_args['original_max_filesize'] = (int) wp_max_upload_size();
 
@@ -159,6 +159,8 @@ abstract class BP_Attachment {
 		$upload_errors = array(
 			0 => __( 'The file was uploaded successfully', 'buddypress' ),
 			1 => __( 'The uploaded file exceeds the maximum allowed file size for this site', 'buddypress' ),
+
+			/* translators: %s: Max file size for the file */
 			2 => sprintf( __( 'The uploaded file exceeds the maximum allowed file size of: %s', 'buddypress' ), size_format( $this->original_max_filesize ) ),
 			3 => __( 'The uploaded file was only partially uploaded.', 'buddypress' ),
 			4 => __( 'No file was uploaded.', 'buddypress' ),
@@ -219,13 +221,6 @@ abstract class BP_Attachment {
 		 */
 		add_filter( "{$this->action}_prefilter", array( $this, 'validate_upload' ), 10, 1 );
 
-		/**
-		 * The above dynamic filter was introduced in WordPress 4.0, as we support WordPress
-		 * back to 3.6, we need to also use the pre 4.0 static filter and remove it after
-		 * the upload was processed.
-		 */
-		add_filter( 'wp_handle_upload_prefilter', array( $this, 'validate_upload' ), 10, 1 );
-
 		// Set Default overrides.
 		$overrides = array(
 			'action'               => $this->action,
@@ -268,19 +263,48 @@ abstract class BP_Attachment {
 			add_filter( 'upload_dir', $upload_dir_filter, 10, $this->upload_dir_filter_args );
 		}
 
+		// Helper for utf-8 filenames.
+		add_filter( 'sanitize_file_name', array( $this, 'sanitize_utf8_filename' ) );
+
 		// Upload the attachment.
 		$this->attachment = wp_handle_upload( $file[ $this->file_input ], $overrides, $time );
+
+		remove_filter( 'sanitize_file_name', array( $this, 'sanitize_utf8_filename' ) );
 
 		// Restore WordPress Uploads data.
 		if ( ! empty( $upload_dir_filter ) ) {
 			remove_filter( 'upload_dir', $upload_dir_filter, 10 );
 		}
 
-		// Remove the pre WordPress 4.0 static filter.
-		remove_filter( 'wp_handle_upload_prefilter', array( $this, 'validate_upload' ), 10 );
-
 		// Finally return the uploaded file or the error.
 		return $this->attachment;
+	}
+
+	/**
+	 * Helper to convert utf-8 characters in filenames to their ASCII equivalent.
+	 *
+	 * @since 2.9.0
+	 *
+	 * @param  string $retval Filename.
+	 * @return string
+	 */
+	public function sanitize_utf8_filename( $retval ) {
+		// PHP 5.4+ or with PECL intl 2.0+
+		if ( function_exists( 'transliterator_transliterate' ) && seems_utf8( $retval ) ) {
+			$retval = transliterator_transliterate( 'Any-Latin; Latin-ASCII; [\u0080-\u7fff] remove', $retval );
+
+		// Older.
+		} else {
+			// Use WP's built-in function to convert accents to their ASCII equivalent.
+			$retval = remove_accents( $retval );
+
+			// Still here? use iconv().
+			if ( function_exists( 'iconv' ) && seems_utf8( $retval ) ) {
+				$retval = iconv( 'UTF-8', 'ASCII//TRANSLIT//IGNORE', $retval );
+			}
+		}
+
+		return $retval;
 	}
 
 	/**
@@ -478,7 +502,15 @@ abstract class BP_Attachment {
 			$ext           = $is_image['ext'];
 
 			if ( empty( $ext ) || empty( $supported_image_types[ $ext ] ) ) {
-				$wp_error->add( 'crop_error', sprintf( __( 'Cropping the file failed: %s is not a supported image file.', 'buddypress' ), $file['error'] ) );
+				$wp_error->add(
+					'crop_error',
+					sprintf(
+						/* translators: %s: image file extension */
+						__( 'Cropping the file failed: %s is not a supported image file.', 'buddypress' ),
+						$file['error']
+					)
+				);
+
 				return $wp_error;
 			}
 		}
@@ -553,21 +585,7 @@ abstract class BP_Attachment {
 
 		// Now try to get image's meta data.
 		$meta = wp_read_image_metadata( $file );
-
 		if ( ! empty( $meta ) ) {
-			// Before 4.0 the Orientation wasn't included.
-			if ( ! isset( $meta['orientation'] ) &&
-				is_callable( 'exif_read_data' ) &&
-				in_array( $sourceImageType, apply_filters( 'wp_read_image_metadata_types', array( IMAGETYPE_JPEG, IMAGETYPE_TIFF_II, IMAGETYPE_TIFF_MM ) ) )
-			) {
-				$exif = exif_read_data( $file );
-
-				if ( ! empty( $exif['Orientation'] ) ) {
-					$meta['orientation'] = $exif['Orientation'];
-				}
-			}
-
-			// Now add the metas to image data.
 			$image_data['meta'] = $meta;
 		}
 

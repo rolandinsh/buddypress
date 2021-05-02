@@ -81,7 +81,20 @@ function bp_friends_random_friends() {
 	} ?>
 
 	<div class="info-group">
-		<h4><?php bp_word_or_name( __( "My Friends", 'buddypress' ), __( "%s's Friends", 'buddypress' ) ) ?>  (<?php echo BP_Friends_Friendship::total_friend_count( bp_displayed_user_id() ) ?>) <span><a href="<?php echo trailingslashit( bp_displayed_user_domain() . bp_get_friends_slug() ) ?>"><?php _e('See All', 'buddypress') ?></a></span></h4>
+		<h4>
+			<?php
+			/* translators: %s: member name */
+			bp_word_or_name( __( "My Friends", 'buddypress' ), __( "%s's Friends", 'buddypress' ) );
+			?>
+			&nbsp;
+			(<?php echo BP_Friends_Friendship::total_friend_count( bp_displayed_user_id() ); ?>)
+			&nbsp;
+			<span>
+				<a href="<?php echo trailingslashit( bp_displayed_user_domain() . bp_get_friends_slug() ) ?>">
+					<?php esc_html_e( 'See All', 'buddypress' ) ?>
+				</a>
+			</span>
+		</h4>
 
 		<?php if ( $friend_ids ) { ?>
 
@@ -101,7 +114,12 @@ function bp_friends_random_friends() {
 		<?php } else { ?>
 
 			<div id="message" class="info">
-				<p><?php bp_word_or_name( __( "You haven't added any friend connections yet.", 'buddypress' ), __( "%s hasn't created any friend connections yet.", 'buddypress' ) ) ?></p>
+				<p>
+					<?php
+					/* translators: %s: member name */
+					bp_word_or_name( __( "You haven't added any friend connections yet.", 'buddypress' ), __( "%s hasn't created any friend connections yet.", 'buddypress' ) );
+					?>
+				</p>
 			</div>
 
 		<?php } ?>
@@ -234,22 +252,21 @@ function bp_member_total_friend_count() {
 	function bp_get_member_total_friend_count() {
 		global $members_template;
 
-		if ( 1 == (int) $members_template->member->total_friend_count ) {
+		$total_friend_count = (int) $members_template->member->total_friend_count;
 
-			/**
-			 * Filters text used to denote total friend count.
-			 *
-			 * @since 1.2.0
-			 *
-			 * @param string $value String of the form "x friends".
-			 * @param int    $value Total friend count for current member in the loop.
-			 */
-			return apply_filters( 'bp_get_member_total_friend_count', sprintf( __( '%d friend', 'buddypress' ), (int) $members_template->member->total_friend_count ) );
-		} else {
-
-			/** This filter is documented in bp-friends/bp-friends-template.php */
-			return apply_filters( 'bp_get_member_total_friend_count', sprintf( __( '%d friends', 'buddypress' ), (int) $members_template->member->total_friend_count ) );
-		}
+		/**
+		 * Filters text used to denote total friend count.
+		 *
+		 * @since 1.2.0
+		 *
+		 * @param string $value String of the form "x friends".
+		 * @param int    $value Total friend count for current member in the loop.
+		 */
+		return apply_filters(
+			'bp_get_member_total_friend_count',
+			/* translators: %d: total friend count */
+			sprintf( _n( '%d friend', '%d friends', $total_friend_count, 'buddypress' ), number_format_i18n( $total_friend_count ) )
+		);
 	}
 
 /**
@@ -346,7 +363,7 @@ function bp_add_friend_button( $potential_friend_id = 0, $friend_status = false 
 	 * @param int  $potential_friend_id ID of the user to whom the button
 	 *                                  applies. Default: value of {@link bp_get_potential_friend_id()}.
 	 * @param bool $friend_status       Not currently used.
-	 * @return string HTML for the Add Friend button.
+	 * @return false|string HTML for the Add Friend button.
 	 */
 	function bp_get_add_friend_button( $potential_friend_id = 0, $friend_status = false ) {
 
@@ -441,8 +458,8 @@ function bp_add_friend_button( $potential_friend_id = 0, $friend_status = false 
  *
  * @param int $user_id Optional. Default: the displayed user's ID, or the
  *                     logged-in user's ID.
- * @return string|bool A comma-separated list of friend IDs if any are found,
- *                     otherwise false.
+ * @return false|string A comma-separated list of friend IDs if any are found,
+ *                      otherwise false.
  */
 function bp_get_friend_ids( $user_id = 0 ) {
 
@@ -563,7 +580,7 @@ function bp_friend_accept_request_link() {
 		 * @param string $value         Accept-friendship URL.
 		 * @param int    $friendship_id ID of the friendship.
 		 */
-		return apply_filters( 'bp_get_friend_accept_request_link', wp_nonce_url( bp_loggedin_user_domain() . bp_get_friends_slug() . '/requests/accept/' . $friendship_id, 'friends_accept_friendship' ), $friendship_id );
+		return apply_filters( 'bp_get_friend_accept_request_link', wp_nonce_url( trailingslashit( bp_loggedin_user_domain() . bp_get_friends_slug() . '/requests/accept/' . $friendship_id ), 'friends_accept_friendship' ), $friendship_id );
 	}
 
 /**
@@ -598,7 +615,7 @@ function bp_friend_reject_request_link() {
 		 * @param string $value         Reject-friendship URL.
 		 * @param int    $friendship_id ID of the friendship.
 		 */
-		return apply_filters( 'bp_get_friend_reject_request_link', wp_nonce_url( bp_loggedin_user_domain() . bp_get_friends_slug() . '/requests/reject/' . $friendship_id, 'friends_reject_friendship' ), $friendship_id );
+		return apply_filters( 'bp_get_friend_reject_request_link', wp_nonce_url( trailingslashit( bp_loggedin_user_domain() . bp_get_friends_slug() . '/requests/reject/' . $friendship_id ), 'friends_reject_friendship' ), $friendship_id );
 	}
 
 /**
@@ -632,7 +649,6 @@ function bp_total_friend_count( $user_id = 0 ) {
 		 */
 		return apply_filters( 'bp_get_total_friend_count', friends_get_total_friend_count( $user_id ), $user_id );
 	}
-	add_filter( 'bp_get_total_friend_count', 'bp_core_number_format' );
 
 /**
  * Output the total friendship request count for a given user.
@@ -716,7 +732,11 @@ function bp_friends_get_profile_stats( $args = '' ) {
 			}
 
 			// If friends exist, show some formatted output.
-			$r['output'] = $r['before'] . sprintf( _n( '%s friend', '%s friends', $r['friends'], 'buddypress' ), '<strong>' . $r['friends'] . '</strong>' ) . $r['after'];
+			$r['output'] = $r['before'];
+
+			/* translators: %d: total friend count */
+			$r['output'] .= sprintf( _n( '%d friend', '%d friends', $r['friends'], 'buddypress' ), '<strong>' . number_format_i18n( $r['friends'] ) . '</strong>' );
+			$r['output'] .= $r['after'];
 		}
 	}
 

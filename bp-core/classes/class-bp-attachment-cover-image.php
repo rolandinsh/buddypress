@@ -37,8 +37,11 @@ class BP_Attachment_Cover_Image extends BP_Attachment {
 
 			// Specific errors for cover images.
 			'upload_error_strings'  => array(
-				11  => sprintf( __( 'That image is too big. Please upload one smaller than %s', 'buddypress' ), size_format( $max_upload_file_size ) ),
-				12  => sprintf( _n( 'Please upload only this file type: %s.', 'Please upload only these file types: %s.', count( $allowed_types ), 'buddypress' ), self::get_cover_image_types( $allowed_types ) ),
+				/* translators: %s: Max file size for the cover image */
+				11  => sprintf( _x( 'That image is too big. Please upload one smaller than %s', 'cover image upload error', 'buddypress' ), size_format( $max_upload_file_size ) ),
+
+				/* translators: %s: comma separated list of file types allowed for the cover image */
+				12  => sprintf( _nx( 'Please upload only this file type: %s.', 'Please upload only these file types: %s.', count( $allowed_types ), 'cover image upload error', 'buddypress' ), self::get_cover_image_types( $allowed_types ) ),
 			),
 		) );
 	}
@@ -75,11 +78,11 @@ class BP_Attachment_Cover_Image extends BP_Attachment {
 		}
 
 		// File size is too big.
-		if ( $file['size'] > $this->original_max_filesize ) {
+		if ( isset( $file['size'] ) && ( $file['size'] > $this->original_max_filesize ) ) {
 			$file['error'] = 11;
 
 		// File is of invalid type.
-		} elseif ( ! bp_attachments_check_filetype( $file['tmp_name'], $file['name'], bp_attachments_get_allowed_mimes( 'cover_image' ) ) ) {
+		} elseif ( isset( $file['tmp_name'] ) && isset( $file['name'] ) && ! bp_attachments_check_filetype( $file['tmp_name'], $file['name'], bp_attachments_get_allowed_mimes( 'cover_image' ) ) ) {
 			$file['error'] = 12;
 		}
 
@@ -96,40 +99,7 @@ class BP_Attachment_Cover_Image extends BP_Attachment {
 	 * @return array $value Upload data (path, url, basedir...).
 	 */
 	public function upload_dir_filter( $upload_dir = array() ) {
-		// Default values are for profiles.
-		$object_id = bp_displayed_user_id();
-
-		if ( empty( $object_id ) ) {
-			$object_id = bp_loggedin_user_id();
-		}
-
-		$object_directory = 'members';
-
-		// We're in a group, edit default values.
-		if ( bp_is_group() || bp_is_group_create() ) {
-			$object_id        = bp_get_current_group_id();
-			$object_directory = 'groups';
-		}
-
-		// Set the subdir.
-		$subdir  = '/' . $object_directory . '/' . $object_id . '/cover-image';
-
-		/**
-		 * Filters the cover image upload directory.
-		 *
-		 * @since 2.4.0
-		 *
-		 * @param array $value      Array containing the path, URL, and other helpful settings.
-		 * @param array $upload_dir The original Uploads dir.
-		 */
-		return apply_filters( 'bp_attachments_cover_image_upload_dir', array(
-			'path'    => $this->upload_path . $subdir,
-			'url'     => $this->url . $subdir,
-			'subdir'  => $subdir,
-			'basedir' => $this->upload_path,
-			'baseurl' => $this->url,
-			'error'   => false
-		), $upload_dir );
+		return bp_attachments_cover_image_upload_dir();
 	}
 
 	/**
@@ -201,7 +171,7 @@ class BP_Attachment_Cover_Image extends BP_Attachment {
 	 * @since 2.4.0
 	 *
 	 * @param string $file The absolute path to the file.
-	 * @return string $value The absolute path to the new file name.
+	 * @return false|string $value The absolute path to the new file name.
 	 */
 	public function generate_filename( $file = '' ) {
 		if ( empty( $file ) || ! file_exists( $file ) ) {

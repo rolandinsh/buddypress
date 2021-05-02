@@ -63,7 +63,7 @@ class BP_Blogs_Component extends BP_Component {
 		);
 
 		$meta_tables = array(
-			'blog' => $bp->table_prefix . 'bp_user_blogs_blogmeta',
+			'bp_blog' => $bp->table_prefix . 'bp_user_blogs_blogmeta',
 		);
 
 		// Fetch the default directory title.
@@ -125,8 +125,6 @@ class BP_Blogs_Component extends BP_Component {
 		// Files to include.
 		$includes = array(
 			'cache',
-			'actions',
-			'screens',
 			'template',
 			'filters',
 			'functions',
@@ -142,6 +140,46 @@ class BP_Blogs_Component extends BP_Component {
 
 		// Include the files.
 		parent::includes( $includes );
+	}
+
+	/**
+	 * Late includes method.
+	 *
+	 * Only load up certain code when on specific pages.
+	 *
+	 * @since 3.0.0
+	 */
+	public function late_includes() {
+		// Bail if PHPUnit is running.
+		if ( defined( 'BP_TESTS_DIR' ) ) {
+			return;
+		}
+
+		// Bail if not on a blogs page or not multisite.
+		if ( ! bp_is_blogs_component() || ! is_multisite() ) {
+			return;
+		}
+
+		// Actions.
+		if ( isset( $_GET['random-blog'] ) ) {
+			require $this->path . 'bp-blogs/actions/random.php';
+		}
+
+		// Screens.
+		if ( bp_is_user() ) {
+			require $this->path . 'bp-blogs/screens/my-blogs.php';
+		} else {
+			if ( bp_is_blogs_directory() ) {
+				require $this->path . 'bp-blogs/screens/directory.php';
+			}
+
+			if ( is_user_logged_in() && bp_is_current_action( 'create' ) ) {
+				require $this->path . 'bp-blogs/screens/create.php';
+			}
+
+			// Theme compatibility.
+			new BP_Blogs_Theme_Compat();
+		}
 	}
 
 	/**
@@ -186,7 +224,7 @@ class BP_Blogs_Component extends BP_Component {
 			sprintf(
 				'<span class="%s">%s</span>',
 				esc_attr( $class ),
-				bp_core_number_format( $count )
+				esc_html( $count )
 			)
 		);
 		$main_nav = array(
@@ -291,7 +329,11 @@ class BP_Blogs_Component extends BP_Component {
 				$bp->bp_options_avatar = bp_core_fetch_avatar( array(
 					'item_id' => bp_displayed_user_id(),
 					'type'    => 'thumb',
-					'alt'     => sprintf( __( 'Profile picture of %s', 'buddypress' ), bp_get_displayed_user_fullname() )
+					'alt'     => sprintf(
+						/* translators: %s: member name */
+						__( 'Profile picture of %s', 'buddypress' ),
+						bp_get_displayed_user_fullname()
+					),
 				) );
 				$bp->bp_options_title = bp_get_displayed_user_fullname();
 			}
@@ -309,9 +351,32 @@ class BP_Blogs_Component extends BP_Component {
 
 		// Global groups.
 		wp_cache_add_global_groups( array(
-			'blog_meta'
+			'bp_blog_meta'
 		) );
 
 		parent::setup_cache_groups();
+	}
+
+	/**
+	 * Init the BP REST API.
+	 *
+	 * @since 6.0.0
+	 *
+	 * @param array $controllers Optional. See BP_Component::rest_api_init() for
+	 *                           description.
+	 */
+	public function rest_api_init( $controllers = array() ) {
+		if ( is_multisite() ) {
+			$controllers = array(
+				'BP_REST_Blogs_Endpoint',
+			);
+
+			// Support to Blog Avatar.
+			if ( bp_is_active( 'blogs', 'site-icon' ) ) {
+				$controllers[] = 'BP_REST_Attachments_Blog_Avatar_Endpoint';
+			}
+		}
+
+		parent::rest_api_init( $controllers );
 	}
 }

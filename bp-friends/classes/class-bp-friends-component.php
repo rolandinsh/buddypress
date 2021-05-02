@@ -47,21 +47,51 @@ class BP_Friends_Component extends BP_Component {
 	public function includes( $includes = array() ) {
 		$includes = array(
 			'cache',
-			'actions',
-			'screens',
 			'filters',
-			'activity',
 			'template',
 			'functions',
 			'widgets',
 		);
 
 		// Conditional includes.
+		if ( bp_is_active( 'activity' ) ) {
+			$includes[] = 'activity';
+		}
 		if ( bp_is_active( 'notifications' ) ) {
 			$includes[] = 'notifications';
 		}
 
 		parent::includes( $includes );
+	}
+
+	/**
+	 * Late includes method.
+	 *
+	 * Only load up certain code when on specific pages.
+	 *
+	 * @since 3.0.0
+	 */
+	public function late_includes() {
+		// Bail if PHPUnit is running.
+		if ( defined( 'BP_TESTS_DIR' ) ) {
+			return;
+		}
+
+		// Friends.
+		if ( bp_is_user_friends() ) {
+			// Authenticated actions.
+			if ( is_user_logged_in() &&
+				in_array( bp_current_action(), array( 'add-friend', 'remove-friend' ), true )
+			) {
+				require $this->path . 'bp-friends/actions/' . bp_current_action() . '.php';
+			}
+
+			// User nav.
+			require $this->path . 'bp-friends/screens/my-friends.php';
+			if ( is_user_logged_in() && bp_is_user_friend_requests() ) {
+				require $this->path . 'bp-friends/screens/requests.php';
+			}
+		}
 	}
 
 	/**
@@ -146,7 +176,7 @@ class BP_Friends_Component extends BP_Component {
 			sprintf(
 				'<span class="%s">%s</span>',
 				esc_attr( $class ),
-				bp_core_number_format( $count )
+				esc_html( $count )
 			)
 		);
 
@@ -266,7 +296,11 @@ class BP_Friends_Component extends BP_Component {
 				$bp->bp_options_avatar = bp_core_fetch_avatar( array(
 					'item_id' => bp_displayed_user_id(),
 					'type'    => 'thumb',
-					'alt'     => sprintf( __( 'Profile picture of %s', 'buddypress' ), bp_get_displayed_user_fullname() )
+					'alt'     => sprintf(
+						/* translators: %s: member name */
+						__( 'Profile picture of %s', 'buddypress' ),
+						bp_get_displayed_user_fullname()
+					),
 				) );
 				$bp->bp_options_title = bp_get_displayed_user_fullname();
 			}
@@ -290,5 +324,17 @@ class BP_Friends_Component extends BP_Component {
 		) );
 
 		parent::setup_cache_groups();
+	}
+
+	/**
+	 * Init the BP REST API.
+	 *
+	 * @since 6.0.0
+	 *
+	 * @param array $controllers Optional. See BP_Component::rest_api_init() for
+	 *                           description.
+	 */
+	public function rest_api_init( $controllers = array() ) {
+		parent::rest_api_init( array( 'BP_REST_Friends_Endpoint' ) );
 	}
 }

@@ -177,7 +177,7 @@ class BP_XProfile_Field {
 		if ( ! empty( $id ) ) {
 			$this->populate( $id, $user_id, $get_data );
 
-		// Initialise the type obj to prevent fatals when creating new profile fields.
+		// Initialize the type obj to prevent fatals when creating new profile fields.
 		} else {
 			$this->type_obj            = bp_xprofile_create_field_type( 'textbox' );
 			$this->type_obj->field_obj = $this;
@@ -231,12 +231,12 @@ class BP_XProfile_Field {
 	 *
 	 * @static
 	 *
-	 * @param int  $field_id ID of the field.
-	 * @param int  $user_id  Optional. ID of the user associated with the field.
-	 *                       Ignored if `$get_data` is false. If `$get_data` is
-	 *                       true, but no `$user_id` is provided, defaults to
-	 *                       logged-in user ID.
-	 * @param bool $get_data Whether to fetch data for the specified `$user_id`.
+	 * @param int      $field_id ID of the field.
+	 * @param int|null $user_id  Optional. ID of the user associated with the field.
+	 *                           Ignored if `$get_data` is false. If `$get_data` is
+	 *                           true, but no `$user_id` is provided, defaults to
+	 *                           logged-in user ID.
+	 * @param bool     $get_data Whether to fetch data for the specified `$user_id`.
 	 * @return BP_XProfile_Field|false Field object if found, otherwise false.
 	 */
 	public static function get_instance( $field_id, $user_id = null, $get_data = true ) {
@@ -292,7 +292,7 @@ class BP_XProfile_Field {
 	 * @since 2.4.0
 	 *
 	 * @param string $key Property name.
-	 * @return mixed
+	 * @return string|null
 	 */
 	public function __get( $key ) {
 		switch ( $key ) {
@@ -344,6 +344,16 @@ class BP_XProfile_Field {
 			return false;
 		}
 
+		/**
+		 * Fires before the current field instance gets deleted.
+		 *
+		 * @since 3.0.0
+		 *
+		 * @param BP_XProfile_Field $this        Current instance of the field being deleted. Passed by reference.
+		 * @param bool              $delete_data Whether or not to delete data.
+		 */
+		do_action_ref_array( 'xprofile_field_before_delete', array( &$this, $delete_data ) );
+
 		$bp  = buddypress();
 		$sql = $wpdb->prepare( "DELETE FROM {$bp->profile->table_name_fields} WHERE id = %d OR parent_id = %d", $this->id, $this->id );
 
@@ -351,10 +361,23 @@ class BP_XProfile_Field {
 			return false;
 		}
 
+		// Delete all metadata for this field.
+		bp_xprofile_delete_meta( $this->id, 'field' );
+
 		// Delete the data in the DB for this field.
 		if ( true === $delete_data ) {
 			BP_XProfile_ProfileData::delete_for_field( $this->id );
 		}
+
+		/**
+		 * Fires after the current field instance gets deleted.
+		 *
+		 * @since 3.0.0
+		 *
+		 * @param BP_XProfile_Field $this        Current instance of the field being deleted. Passed by reference.
+		 * @param bool              $delete_data Whether or not to delete data.
+		 */
+		do_action_ref_array( 'xprofile_field_after_delete', array( &$this, $delete_data ) );
 
 		return true;
 	}
@@ -555,11 +578,13 @@ class BP_XProfile_Field {
 		 * Filters the found children for a field.
 		 *
 		 * @since 1.2.5
+		 * @since 3.0.0 Added the `$this` parameter.
 		 *
-		 * @param object $children    Found children for a field.
-		 * @param bool   $for_editing Whether or not the field is for editing.
+		 * @param object            $children    Found children for a field.
+		 * @param bool              $for_editing Whether or not the field is for editing.
+		 * @param BP_XProfile_Field $this        Field object
 		 */
-		return apply_filters( 'bp_xprofile_field_get_children', $children, $for_editing );
+		return apply_filters( 'bp_xprofile_field_get_children', $children, $for_editing, $this );
 	}
 
 	/**
@@ -614,7 +639,7 @@ class BP_XProfile_Field {
 				}
 			}
 
-			// If no member types have been saved, intepret as *all* member types.
+			// If no member types have been saved, interpret as *all* member types.
 			if ( empty( $types ) ) {
 				$types = array_values( $registered_types );
 
@@ -759,6 +784,7 @@ class BP_XProfile_Field {
 				$member_type_labels[] = __( 'Users with no member type', 'buddypress' );
 			}
 
+			/* translators: %s: comma separated list of member types */
 			$label = sprintf( __( '(Member types: %s)', 'buddypress' ), implode( ', ', array_map( 'esc_html', $member_type_labels ) ) );
 		} else {
 			$label = '<span class="member-type-none-notice">' . __( '(Unavailable to all members)', 'buddypress' ) . '</span>';
@@ -837,7 +863,15 @@ class BP_XProfile_Field {
 			}
 		}
 
-		return $this->do_autolink;
+		/**
+		 * Filters the autolink property of the field.
+		 *
+		 * @since 6.0.0
+		 *
+		 * @param bool              $do_autolink The autolink property of the field.
+		 * @param BP_XProfile_Field $this Field object.
+		 */
+		return apply_filters( 'bp_xprofile_field_do_autolink', $this->do_autolink, $this );
 	}
 
 	/* Static Methods ********************************************************/
@@ -952,6 +986,8 @@ class BP_XProfile_Field {
 		$sql        = $wpdb->prepare( "UPDATE {$table_name} SET field_order = %d, group_id = %d WHERE id = %d", $position, $field_group_id, $field_id );
 		$parent     = $wpdb->query( $sql );
 
+		$retval = false;
+
 		// Update $field_id with new $position and $field_group_id.
 		if ( ! empty( $parent ) && ! is_wp_error( $parent ) ) {
 
@@ -959,13 +995,15 @@ class BP_XProfile_Field {
 			$sql = $wpdb->prepare( "UPDATE {$table_name} SET group_id = %d WHERE parent_id = %d", $field_group_id, $field_id );
 			$wpdb->query( $sql );
 
-			// Invalidate profile field cache.
+			// Invalidate profile field and group query cache.
 			wp_cache_delete( $field_id, 'bp_xprofile_fields' );
 
-			return $parent;
+			$retval = $parent;
 		}
 
-		return false;
+		bp_core_reset_incrementor( 'bp_xprofile_groups' );
+
+		return $retval;
 	}
 
 	/**
@@ -1043,7 +1081,7 @@ class BP_XProfile_Field {
 	}
 
 	/**
-	 * Validate form field data on sumbission.
+	 * Validate form field data on submission.
 	 *
 	 * @since 2.2.0
 	 *
@@ -1074,11 +1112,12 @@ class BP_XProfile_Field {
 
 		// Check that field is of valid type.
 		if ( ! in_array( $_POST['fieldtype'], array_keys( bp_xprofile_get_field_types() ), true ) ) {
+			/* translators: %s: field type name */
 			$message = sprintf( esc_html__( 'The profile field type %s is not registered.', 'buddypress' ), '<code>' . esc_attr( $_POST['fieldtype'] ) . '</code>' );
 			return false;
 		}
 
-		// Get field type so we can check for and lavidate any field options.
+		// Get field type so we can check for and validate any field options.
 		$field_type = bp_xprofile_create_field_type( $_POST['fieldtype'] );
 
 		// Field type requires options.
@@ -1100,12 +1139,14 @@ class BP_XProfile_Field {
 
 			// Check for missing or malformed options.
 			if ( 0 === $field_count ) {
+				/* translators: %s: field type name */
 				$message = sprintf( esc_html__( '%s require at least one option.', 'buddypress' ), $field_type->name );
 				return false;
 			}
 
 			// If only one option exists, it cannot be an empty string.
 			if ( ( 1 === $field_count ) && ( '' === $field_options[0] ) ) {
+				/* translators: %s: field type name */
 				$message = sprintf( esc_html__( '%s require at least one option.', 'buddypress' ), $field_type->name );
 				return false;
 			}
@@ -1145,10 +1186,19 @@ class BP_XProfile_Field {
 	 * @param string $message Message to display.
 	 */
 	public function render_admin_form( $message = '' ) {
+
+		// Users Admin URL.
+		$users_url = bp_get_admin_url( 'users.php' );
+
+		// Add New.
 		if ( empty( $this->id ) ) {
 			$title  = __( 'Add New Field', 'buddypress' );
-			$action	= "users.php?page=bp-profile-setup&amp;group_id=" . $this->group_id . "&amp;mode=add_field#tabs-" . $this->group_id;
-			$button	= __( 'Save', 'buddypress' );
+			$button	= __( 'Save',          'buddypress' );
+			$action = add_query_arg( array(
+				'page'     => 'bp-profile-setup',
+				'mode'     => 'add_field',
+				'group_id' => (int) $this->group_id
+			), $users_url . '#tabs-' . (int) $this->group_id );
 
 			if ( !empty( $_POST['saveField'] ) ) {
 				$this->name        = $_POST['title'];
@@ -1161,19 +1211,27 @@ class BP_XProfile_Field {
 					$this->order_by = $_POST["sort_order_{$this->type}"];
 				}
 			}
+
+		// Edit.
 		} else {
 			$title  = __( 'Edit Field', 'buddypress' );
-			$action = "users.php?page=bp-profile-setup&amp;mode=edit_field&amp;group_id=" . $this->group_id . "&amp;field_id=" . $this->id . "#tabs-" . $this->group_id;
-			$button	= __( 'Update', 'buddypress' );
+			$button	= __( 'Update',     'buddypress' );
+			$action = add_query_arg( array(
+				'page'     => 'bp-profile-setup',
+				'mode'     => 'edit_field',
+				'group_id' => (int) $this->group_id,
+				'field_id' => (int) $this->id
+			), $users_url . '#tabs-' . (int) $this->group_id );
 		} ?>
 
 		<div class="wrap">
 
-			<h1><?php echo esc_html( $title ); ?></h1>
+			<h1 class="wp-heading-inline"><?php echo esc_html( $title ); ?></h1>
+			<hr class="wp-header-end">
 
 			<?php if ( !empty( $message ) ) : ?>
 
-				<div id="message" class="error fade">
+				<div id="message" class="error fade notice is-dismissible">
 					<p><?php echo esc_html( $message ); ?></p>
 				</div>
 
@@ -1268,6 +1326,21 @@ class BP_XProfile_Field {
 	 */
 	private function submit_metabox( $button_text = '' ) {
 
+		// Setup the URL for deleting
+		$users_url  = bp_get_admin_url( 'users.php' );
+		$cancel_url = add_query_arg( array(
+			'page' => 'bp-profile-setup'
+		), $users_url );
+
+
+		// Delete.
+		if ( $this->can_delete ) {
+			$delete_url = wp_nonce_url( add_query_arg( array(
+				'page'     => 'bp-profile-setup',
+				'mode'     => 'delete_field',
+				'field_id' => (int) $this->id
+			), $users_url ), 'bp_xprofile_delete_field-' . $this->id, 'bp_xprofile_delete_field' );
+		}
 		/**
 		 * Fires before XProfile Field submit metabox.
 		 *
@@ -1305,7 +1378,11 @@ class BP_XProfile_Field {
 						<?php endif; ?>
 
 						<div id="delete-action">
-							<a href="users.php?page=bp-profile-setup" class="deletion"><?php esc_html_e( 'Cancel', 'buddypress' ); ?></a>
+							<?php if ( ! empty( $this->id ) && isset( $delete_url ) ) : ?>
+								<a href="<?php echo esc_url( $delete_url ); ?>" class="submitdelete deletion"><?php esc_html_e( 'Delete', 'buddypress' ); ?></a>
+							<?php endif; ?>
+
+							<div><a href="<?php echo esc_url( $cancel_url ); ?>" class="deletion"><?php esc_html_e( 'Cancel', 'buddypress' ); ?></a></div>
 						</div>
 
 						<?php wp_nonce_field( 'xprofile_delete_option' ); ?>
@@ -1562,7 +1639,7 @@ class BP_XProfile_Field {
 	 */
 	private function default_field_hidden_inputs() {
 
-		// Nonce
+		// Nonce.
 		wp_nonce_field( 'bp_xprofile_admin_field', 'bp_xprofile_admin_field' );
 
 		// Field 1 is the fullname field, which cannot have custom visibility.

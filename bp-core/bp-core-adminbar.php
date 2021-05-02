@@ -30,7 +30,7 @@ function bp_admin_bar_my_account_root() {
 	if ( is_user_logged_in() ) {
 
 		// Add secondary parent item for all BuddyPress components.
-		$wp_admin_bar->add_menu( array(
+		$wp_admin_bar->add_node( array(
 			'parent'    => 'my-account',
 			'id'        => 'my-account-buddypress',
 			'title'     => __( 'My Account', 'buddypress' ),
@@ -39,12 +39,6 @@ function bp_admin_bar_my_account_root() {
 				'class' => 'ab-sub-secondary'
 			)
 		) );
-
-		// Remove 'Edit' post link as it's not applicable to BP.
-		// Remove when https://core.trac.wordpress.org/ticket/29538 is addressed.
-		if ( is_buddypress() ) {
-			$wp_admin_bar->remove_node( 'edit' );
-		}
 	}
 }
 add_action( 'admin_bar_menu', 'bp_admin_bar_my_account_root', 100 );
@@ -53,8 +47,6 @@ add_action( 'admin_bar_menu', 'bp_admin_bar_my_account_root', 100 );
  * Handle the Toolbar/BuddyBar business.
  *
  * @since 1.2.0
- *
- * @global string $wp_version
  */
 function bp_core_load_admin_bar() {
 

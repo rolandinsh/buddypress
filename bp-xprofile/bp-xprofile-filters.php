@@ -12,12 +12,12 @@
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
 
-add_filter( 'bp_get_the_profile_group_name',            'wp_filter_kses',       1 );
-add_filter( 'bp_get_the_profile_group_description',     'wp_filter_kses',       1 );
-add_filter( 'bp_get_the_profile_field_value',           'xprofile_filter_kses', 1 );
-add_filter( 'bp_get_the_profile_field_name',            'wp_filter_kses',       1 );
-add_filter( 'bp_get_the_profile_field_edit_value',      'wp_filter_kses',       1 );
-add_filter( 'bp_get_the_profile_field_description',     'wp_filter_kses',       1 );
+add_filter( 'bp_get_the_profile_group_name',        'wp_filter_kses', 1 );
+add_filter( 'bp_get_the_profile_group_description', 'wp_filter_kses', 1 );
+add_filter( 'bp_get_the_profile_field_name',        'wp_filter_kses', 1 );
+add_filter( 'bp_get_the_profile_field_edit_value',  'xprofile_sanitize_data_value_before_display', 1, 3 );
+add_filter( 'bp_get_the_profile_field_description', 'wp_filter_kses', 1 );
+add_filter( 'bp_get_the_profile_field_value',       'xprofile_sanitize_data_value_before_display', 1, 3 );
 
 add_filter( 'bp_get_the_profile_field_value',           'wptexturize'        );
 add_filter( 'bp_get_the_profile_field_value',           'convert_chars'      );
@@ -40,7 +40,7 @@ add_filter( 'bp_get_the_profile_field_edit_value',      'stripslashes' );
 add_filter( 'bp_get_the_profile_field_name',            'stripslashes' );
 add_filter( 'bp_get_the_profile_field_description',     'stripslashes' );
 
-add_filter( 'xprofile_get_field_data',                  'xprofile_filter_kses', 1 );
+add_filter( 'xprofile_get_field_data',                  'xprofile_sanitize_data_value_before_display_from_get_field_data', 1, 2 );
 add_filter( 'xprofile_field_name_before_save',          'wp_filter_kses', 1 );
 add_filter( 'xprofile_field_description_before_save',   'wp_filter_kses', 1 );
 
@@ -77,6 +77,9 @@ add_filter( 'xprofile_field_can_delete_before_save',   'absint' );
 add_filter( 'xprofile_field_options_before_save', 'bp_xprofile_sanitize_field_options' );
 add_filter( 'xprofile_field_default_before_save', 'bp_xprofile_sanitize_field_default' );
 
+// Personal data export.
+add_filter( 'wp_privacy_personal_data_exporters', 'bp_xprofile_register_personal_data_exporter' );
+
 /**
  * Sanitize each field option name for saving to the database.
  *
@@ -99,7 +102,7 @@ function bp_xprofile_sanitize_field_options( $field_options = '' ) {
  * @since 2.3.0
  *
  * @param mixed $field_default Field defaults to sanitize.
- * @return mixed
+ * @return array|int
  */
 function bp_xprofile_sanitize_field_default( $field_default = '' ) {
 	if ( is_array( $field_default ) ) {
@@ -113,27 +116,40 @@ function bp_xprofile_sanitize_field_default( $field_default = '' ) {
  * Run profile field values through kses with filterable allowed tags.
  *
  * @since 1.5.0
+ * @since 2.1.0 Added `$data_obj` parameter.
+ * @since 5.0.0 Added `$field_id` parameter.
  *
- * @param string      $content  Content to filter.
- * @param object|null $data_obj The BP_XProfile_ProfileData object.
+ * @param string                       $content  Content to filter.
+ * @param BP_XProfile_ProfileData|null $data_obj Optional. The BP_XProfile_ProfileData object.
+ * @param int|null                     $field_id Optional. The ID of the profile field.
  * @return string $content
  */
-function xprofile_filter_kses( $content, $data_obj = null ) {
+function xprofile_filter_kses( $content, $data_obj = null, $field_id = null ) {
 	global $allowedtags;
 
 	$xprofile_allowedtags             = $allowedtags;
 	$xprofile_allowedtags['a']['rel'] = array();
 
+	if ( null === $field_id && $data_obj instanceof BP_XProfile_ProfileData ) {
+		$field_id = $data_obj->field_id;
+	}
+
 	// If the field supports rich text, we must allow tags that appear in wp_editor().
-	if ( $data_obj instanceof BP_XProfile_ProfileData && bp_xprofile_is_richtext_enabled_for_field( $data_obj->field_id ) ) {
+	if ( $field_id && bp_xprofile_is_richtext_enabled_for_field( $field_id ) ) {
 		$richtext_tags = array(
-			'img'  => array( 'id' => 1, 'class' => 1, 'src' => 1, 'alt' => 1, 'width' => 1, 'height' => 1 ),
-			'ul'   => array( 'id' => 1, 'class' => 1 ),
-			'ol'   => array( 'id' => 1, 'class' => 1 ),
-			'li'   => array( 'id' => 1, 'class' => 1 ),
-			'span' => array( 'style' => 1 ),
-			'p'    => array( 'style' => 1 ),
+			'img'  => array( 'src' => 1, 'alt' => 1, 'width' => 1, 'height' => 1 ),
+			'ul'   => array(),
+			'ol'   => array(),
+			'li'   => array(),
+			'span' => array(),
+			'p'    => array(),
 		);
+
+		// Allow style attributes on certain elements for capable users
+		if ( bp_current_user_can( 'unfiltered_html' ) ) {
+			$richtext_tags['span'] = array( 'style' => 1 );
+			$richtext_tags['p']    = array( 'style' => 1 );
+		}
 
 		$xprofile_allowedtags = array_merge( $allowedtags, $richtext_tags );
 	}
@@ -142,12 +158,40 @@ function xprofile_filter_kses( $content, $data_obj = null ) {
 	 * Filters the allowed tags for use within xprofile_filter_kses().
 	 *
 	 * @since 1.5.0
+	 * @since 2.1.0 Added `$data_obj` parameter.
+	 * @since 5.0.0 Added `$field_id` parameter.
 	 *
-	 * @param array                   $xprofile_allowedtags Array of allowed tags for profile field values.
-	 * @param BP_XProfile_ProfileData $data_obj             The BP_XProfile_ProfileData object.
+	 * @param array                        $xprofile_allowedtags Array of allowed tags for profile field values.
+	 * @param BP_XProfile_ProfileData|null $data_obj             The BP_XProfile_ProfileData object.
+	 * @param int|null                     $field_id             The ID of the profile field.
 	 */
-	$xprofile_allowedtags = apply_filters( 'xprofile_allowed_tags', $xprofile_allowedtags, $data_obj );
+	$xprofile_allowedtags = apply_filters( 'xprofile_allowed_tags', $xprofile_allowedtags, $data_obj, $field_id );
 	return wp_kses( $content, $xprofile_allowedtags );
+}
+
+/**
+ * Filters profile field values for allowed HTML.
+ *
+ * @since 5.0.0
+ *
+ * @param string $value    Field value.
+ * @param string $type     Field type.
+ * @param int    $field_id Field ID.
+ */
+function xprofile_sanitize_data_value_before_display( $value, $type, $field_id ) {
+	return xprofile_filter_kses( $value, null, $field_id );
+}
+
+/**
+ * Filters profile field values for allowed HTML, when coming from xprofile_get_field_data().
+ *
+ * @since 5.0.0
+ *
+ * @param string $value    Field value.
+ * @param int    $field_id Field ID.
+ */
+function xprofile_sanitize_data_value_before_display_from_get_field_data( $value, $field_id ) {
+	return xprofile_filter_kses( $value, $field_id );
 }
 
 /**
@@ -155,7 +199,7 @@ function xprofile_filter_kses( $content, $data_obj = null ) {
  *
  * @since 1.2.6
  *
- * @param string      $field_value Field value being santized.
+ * @param string      $field_value Field value being sanitized.
  * @param int         $field_id    Field ID being sanitized.
  * @param bool        $reserialize Whether to reserialize arrays before returning. Defaults to true.
  * @param object|null $data_obj    The BP_XProfile_ProfileData object.
@@ -168,11 +212,16 @@ function xprofile_sanitize_data_value_before_save( $field_value, $field_id = 0, 
 		return $field_value;
 	}
 
-	// Value might be serialized.
+	// Force reserialization if serialized (avoids mutation, retains integrity)
+	if ( is_serialized( $field_value ) && ( false === $reserialize ) ) {
+		$reserialize = true;
+	}
+
+	// Value might be a serialized array of options.
 	$field_value = maybe_unserialize( $field_value );
 
-	// Filter single value.
-	if ( !is_array( $field_value ) ) {
+	// Sanitize single field value.
+	if ( ! is_array( $field_value ) ) {
 		$kses_field_value     = xprofile_filter_kses( $field_value, $data_obj );
 		$filtered_field_value = wp_rel_nofollow( force_balance_tags( $kses_field_value ) );
 
@@ -187,16 +236,15 @@ function xprofile_sanitize_data_value_before_save( $field_value, $field_id = 0, 
 		 */
 		$filtered_field_value = apply_filters( 'xprofile_filtered_data_value_before_save', $filtered_field_value, $field_value, $data_obj );
 
-	// Filter each array item independently.
+	// Sanitize multiple individual option values.
 	} else {
 		$filtered_values = array();
 		foreach ( (array) $field_value as $value ) {
-			$kses_field_value       = xprofile_filter_kses( $value, $data_obj );
-			$filtered_value 	= wp_rel_nofollow( force_balance_tags( $kses_field_value ) );
+			$kses_field_value = xprofile_filter_kses( $value, $data_obj );
+			$filtered_value   = wp_rel_nofollow( force_balance_tags( $kses_field_value ) );
 
 			/** This filter is documented in bp-xprofile/bp-xprofile-filters.php */
 			$filtered_values[] = apply_filters( 'xprofile_filtered_data_value_before_save', $filtered_value, $value, $data_obj );
-
 		}
 
 		if ( !empty( $reserialize ) ) {
@@ -216,7 +264,7 @@ function xprofile_sanitize_data_value_before_save( $field_value, $field_id = 0, 
  *
  * @param string $field_value XProfile field_value to be filtered.
  * @param string $field_type  XProfile field_type to be filtered.
- * @return string $field_value Filtered XProfile field_value. False on failure.
+ * @return false|string $field_value Filtered XProfile field_value. False on failure.
  */
 function xprofile_filter_format_field_value( $field_value, $field_type = '' ) {
 
@@ -268,7 +316,7 @@ function xprofile_filter_format_field_value_by_type( $field_value, $field_type =
  * @return string
  */
 function xprofile_filter_format_field_value_by_field_id( $field_value, $field_id ) {
-	$field = xprofile_get_field( $field_id );
+	$field = xprofile_get_field( $field_id, null, false );
 	return xprofile_filter_format_field_value_by_type( $field_value, $field->type, $field_id );
 }
 
@@ -284,7 +332,7 @@ function xprofile_filter_format_field_value_by_field_id( $field_value, $field_id
  */
 function xprofile_filter_pre_validate_value_by_field_type( $value, $field, $field_type_obj ) {
 	if ( method_exists( $field_type_obj, 'pre_validate_filter' ) ) {
-		$value = call_user_func( array( $field_type_obj, 'pre_validate_filter' ), $value );
+		$value = call_user_func( array( $field_type_obj, 'pre_validate_filter' ), $value, $field->id );
 	}
 
 	return $value;
@@ -294,7 +342,7 @@ function xprofile_filter_pre_validate_value_by_field_type( $value, $field, $fiel
  * Escape field value for display.
  *
  * Most field values are simply run through esc_html(). Those that support rich text (by default, `textarea` only)
- * are sanitized using kses, which allows a whitelist of HTML tags.
+ * are sanitized using kses, which allows HTML tags from a controlled list.
  *
  * @since 2.4.0
  *
@@ -336,7 +384,7 @@ function bp_xprofile_escape_field_data( $value, $field_type, $field_id ) {
  *
  * @param string $field_value Profile field data value.
  * @param string $field_type  Profile field type.
- * @return string
+ * @return string|array
  */
 function xprofile_filter_link_profile_data( $field_value, $field_type = 'textbox' ) {
 	global $field;
@@ -354,11 +402,27 @@ function xprofile_filter_link_profile_data( $field_value, $field_type = 'textbox
 	}
 
 	if ( strpos( $field_value, ',' ) !== false ) {
+		// Comma-separated lists.
 		$list_type = 'comma';
-		$values    = explode( ',', $field_value ); // Comma-separated lists.
+		$values    = explode( ',', $field_value );
 	} else {
-		$list_type = 'semicolon';
-		$values = explode( ';', $field_value ); // Semicolon-separated lists.
+		/*
+		 * Semicolon-separated lists.
+		 *
+		 * bp_xprofile_escape_field_data() runs before this function, which often runs esc_html().
+		 * In turn, that encodes HTML entities in the string (";" becomes "&#039;").
+		 *
+		 * Before splitting on the ";" character, decode the HTML entities, and re-encode after.
+		 * This prevents input like "O'Hara" rendering as "O&#039; Hara" (with each of those parts
+		 * having a separate HTML link).
+		 */
+		$list_type   = 'semicolon';
+		$field_value = wp_specialchars_decode( $field_value, ENT_QUOTES );
+		$values      = explode( ';', $field_value );
+
+		array_walk( $values, function( &$value, $key ) use ( $field_type, $field ) {
+			$value = bp_xprofile_escape_field_data( $value, $field_type, $field->id );
+		} );
 	}
 
 	if ( ! empty( $values ) ) {
@@ -602,4 +666,23 @@ function bp_xprofile_filter_meta_query( $q ) {
 	}
 
 	return $q;
+}
+
+/**
+ * Register XProfile personal data exporter.
+ *
+ * @since 4.0.0
+ * @since 5.0.0 adds an `exporter_bp_friendly_name` param to exporters.
+ *
+ * @param array $exporters  An array of personal data exporters.
+ * @return array An array of personal data exporters.
+ */
+function bp_xprofile_register_personal_data_exporter( $exporters ) {
+	$exporters['buddypress-xprofile'] = array(
+		'exporter_friendly_name'    => __( 'BuddyPress Extended Profile Data', 'buddypress' ),
+		'callback'                  => 'bp_xprofile_personal_data_exporter',
+		'exporter_bp_friendly_name' => _x( 'Extended Profile information', 'BuddyPress Extended Profile data exporter friendly name', 'buddypress' ),
+	);
+
+	return $exporters;
 }

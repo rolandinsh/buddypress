@@ -55,6 +55,7 @@ add_action( 'generate_rewrite_rules',  'bp_generate_rewrite_rules', 10    );
  */
 add_action( 'bp_loaded', 'bp_setup_components',         2  );
 add_action( 'bp_loaded', 'bp_include',                  4  );
+add_action( 'bp_loaded', 'bp_setup_option_filters',     5  );
 add_action( 'bp_loaded', 'bp_setup_cache_groups',       5  );
 add_action( 'bp_loaded', 'bp_setup_widgets',            6  );
 add_action( 'bp_loaded', 'bp_register_theme_packages',  12 );
@@ -74,15 +75,25 @@ add_action( 'bp_init', 'bp_setup_globals',           4  );
 add_action( 'bp_init', 'bp_setup_canonical_stack',   5  );
 add_action( 'bp_init', 'bp_setup_nav',               6  );
 add_action( 'bp_init', 'bp_setup_title',             8  );
+add_action( 'bp_init', 'bp_blocks_init',             10 );
 add_action( 'bp_init', 'bp_core_load_admin_bar_css', 12 );
 add_action( 'bp_init', 'bp_add_rewrite_tags',        20 );
 add_action( 'bp_init', 'bp_add_rewrite_rules',       30 );
 add_action( 'bp_init', 'bp_add_permastructs',        40 );
 
 /**
- * The bp_register_taxonomies hook - Attached to 'bp_init' @ priority 2 above.
+ * The bp_register_taxonomies hooks - Attached to 'bp_init' @ priority 2 above.
  */
 add_action( 'bp_register_taxonomies', 'bp_register_member_types' );
+add_action( 'bp_register_taxonomies', 'bp_register_type_metadata', 20 );
+
+/**
+ * Late includes.
+ *
+ * Run after the canonical stack is setup to allow for conditional includes
+ * on certain pages.
+ */
+add_action( 'bp_setup_canonical_stack', 'bp_late_include', 20 );
 
 /**
  * The bp_template_redirect hook - Attached to 'template_redirect' above.
@@ -104,8 +115,9 @@ add_action( 'bp_template_redirect', 'bp_get_request',        10 );
 /**
  * Add the BuddyPress functions file and the Theme Compat Default features.
  */
-add_action( 'bp_after_setup_theme', 'bp_load_theme_functions',                    1 );
-add_action( 'bp_after_setup_theme', 'bp_register_theme_compat_default_features', 10 );
+add_action( 'bp_after_setup_theme', 'bp_check_theme_template_pack_dependency',   -10 );
+add_action( 'bp_after_setup_theme', 'bp_load_theme_functions',                    1  );
+add_action( 'bp_after_setup_theme', 'bp_register_theme_compat_default_features',  10 );
 
 // Load the admin.
 if ( is_admin() ) {

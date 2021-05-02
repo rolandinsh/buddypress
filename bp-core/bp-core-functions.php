@@ -16,7 +16,6 @@ defined( 'ABSPATH' ) || exit;
  * Output the BuddyPress version.
  *
  * @since 1.6.0
- *
  */
 function bp_version() {
 	echo bp_get_version();
@@ -36,7 +35,6 @@ function bp_version() {
  * Output the BuddyPress database version.
  *
  * @since 1.6.0
- *
  */
 function bp_db_version() {
 	echo bp_get_db_version();
@@ -56,7 +54,6 @@ function bp_db_version() {
  * Output the BuddyPress database version.
  *
  * @since 1.6.0
- *
  */
 function bp_db_version_raw() {
 	echo bp_get_db_version_raw();
@@ -72,6 +69,19 @@ function bp_db_version_raw() {
 		$bp = buddypress();
 		return !empty( $bp->db_version_raw ) ? $bp->db_version_raw : 0;
 	}
+
+/**
+ * Check whether the current version of WP exceeds a given version.
+ *
+ * @since 7.0.0
+ *
+ * @param string $version WP version, in "PHP-standardized" format.
+ * @param string $compare Optional. Comparison operator. Default '>='.
+ * @return bool
+ */
+function bp_is_running_wp( $version, $compare = '>=' ) {
+	return version_compare( $GLOBALS['wp_version'], $version, $compare );
+}
 
 /** Functions *****************************************************************/
 
@@ -236,7 +246,7 @@ function bp_core_number_format( $number = 0, $decimals = false ) {
  *
  * @since 1.6.0
  *
- * @param array $old_args_keys Old argument indexs, keyed to their positions.
+ * @param array $old_args_keys Old argument indexes, keyed to their positions.
  * @param array $func_args     The parameters passed to the originating function.
  * @return array $new_args The parsed arguments.
  */
@@ -321,7 +331,7 @@ function bp_parse_args( $args, $defaults = array(), $filter_key = '' ) {
 /**
  * Sanitizes a pagination argument based on both the request override and the
  * original value submitted via a query argument, likely to a template class
- * responsible for limiting the resultset of a template loop.
+ * responsible for limiting the result set of a template loop.
  *
  * @since 2.2.0
  *
@@ -445,6 +455,27 @@ function bp_use_wp_admin_bar() {
 	return (bool) apply_filters( 'bp_use_wp_admin_bar', $use_admin_bar );
 }
 
+
+/**
+ * Return the parent forum ID for the Legacy Forums abstraction layer.
+ *
+ * @since 1.5.0
+ * @since 3.0.0 Supported for compatibility with bbPress 2.
+ *
+ * @return int Forum ID.
+ */
+function bp_forums_parent_forum_id() {
+
+	/**
+	 * Filters the parent forum ID for the bbPress abstraction layer.
+	 *
+	 * @since 1.5.0
+	 *
+	 * @param int BP_FORUMS_PARENT_FORUM_ID The Parent forum ID constant.
+	 */
+	return apply_filters( 'bp_forums_parent_forum_id', BP_FORUMS_PARENT_FORUM_ID );
+}
+
 /** Directory *****************************************************************/
 
 /**
@@ -467,12 +498,6 @@ function bp_core_get_packaged_component_ids() {
 		'notifications',
 	);
 
-	// Only add legacy forums if it is enabled
-	// prevents conflicts with bbPress, which also uses the same 'forums' id.
-	if ( class_exists( 'BP_Forums_Component' ) ) {
-		$components[] = 'forums';
-	}
-
 	return $components;
 }
 
@@ -488,30 +513,29 @@ function bp_core_get_packaged_component_ids() {
  *                      empty string if the list is not found.
  */
 function bp_core_get_directory_page_ids( $status = 'active' ) {
-	$page_ids = bp_get_option( 'bp-pages' );
+	$page_ids = bp_get_option( 'bp-pages', array() );
 
-	// Ensure that empty indexes are unset. Should only matter in edge cases.
-	if ( !empty( $page_ids ) && is_array( $page_ids ) ) {
-		foreach( (array) $page_ids as $component_name => $page_id ) {
-			if ( empty( $component_name ) || empty( $page_id ) ) {
-				unset( $page_ids[ $component_name ] );
-			}
+	// Loop through pages.
+	foreach ( $page_ids as $component_name => $page_id ) {
 
-			// 'register' and 'activate' do not have components, but should be whitelisted.
-			if ( 'register' === $component_name || 'activate' === $component_name ) {
-				continue;
-			}
+		// Ensure that empty indexes are unset. Should only matter in edge cases.
+		if ( empty( $component_name ) || empty( $page_id ) ) {
+			unset( $page_ids[ $component_name ] );
+		}
 
-			// Trashed pages should not appear in results.
-			if ( 'trash' == get_post_status( $page_id ) ) {
-				unset( $page_ids[ $component_name ] );
+		// Trashed pages should never appear in results.
+		if ( 'trash' == get_post_status( $page_id ) ) {
+			unset( $page_ids[ $component_name ] );
+		}
 
-			}
+		// 'register' and 'activate' do not have components, but are allowed as special cases.
+		if ( in_array( $component_name, array( 'register', 'activate' ), true ) ) {
+			continue;
+		}
 
-			// Remove inactive component pages, if required.
-			if ( 'active' === $status && ! bp_is_active( $component_name ) ) {
-				unset( $page_ids[ $component_name ] );
-			}
+		// Remove inactive component pages.
+		if ( ( 'active' === $status ) && ! bp_is_active( $component_name ) ) {
+			unset( $page_ids[ $component_name ] );
 		}
 	}
 
@@ -519,10 +543,12 @@ function bp_core_get_directory_page_ids( $status = 'active' ) {
 	 * Filters the list of BP directory pages from the appropriate meta table.
 	 *
 	 * @since 1.5.0
+	 * @since 2.9.0 Add $status parameter
 	 *
-	 * @param array $page_ids Array of directory pages.
+	 * @param array  $page_ids Array of directory pages.
+	 * @param string $status   Page status to limit results to
 	 */
-	return apply_filters( 'bp_core_get_directory_page_ids', $page_ids );
+	return (array) apply_filters( 'bp_core_get_directory_page_ids', $page_ids, $status );
 }
 
 /**
@@ -530,8 +556,8 @@ function bp_core_get_directory_page_ids( $status = 'active' ) {
  *
  * @since 2.6.0
  *
- * @param string $component The slug representing the component. Defaults to the current component.
- * @return int|bool The ID of the directory page associated with the component. False if none is found.
+ * @param string|null $component The slug representing the component. Defaults to the current component.
+ * @return int|false The ID of the directory page associated with the component. False if none is found.
  */
 function bp_core_get_directory_page_id( $component = null ) {
 	if ( ! $component ) {
@@ -662,7 +688,7 @@ function bp_core_add_page_mappings( $components, $existing = 'keep' ) {
 
 	// Delete any existing pages.
 	if ( 'delete' === $existing ) {
-		foreach ( (array) $pages as $page_id ) {
+		foreach ( $pages as $page_id ) {
 			wp_delete_post( $page_id, true );
 		}
 
@@ -854,7 +880,7 @@ function bp_core_add_root_component( $slug ) {
 
 	// If there was no match, add a page for this root component.
 	if ( empty( $match ) ) {
-		$add_root_items   = $bp->add_root();
+		$add_root_items   = $bp->add_root;
 		$add_root_items[] = $slug;
 		$bp->add_root     = $add_root_items;
 	}
@@ -888,21 +914,8 @@ function bp_core_create_root_component_page() {
 		) );
 	}
 
-	$page_ids = array_merge( (array) $new_page_ids, (array) bp_core_get_directory_page_ids( 'all' ) );
+	$page_ids = array_merge( $new_page_ids, bp_core_get_directory_page_ids( 'all' ) );
 	bp_core_update_directory_page_ids( $page_ids );
-}
-
-/**
- * Add illegal blog names to WP so that root components will not conflict with blog names on a subdirectory installation.
- *
- * For example, it would stop someone creating a blog with the slug "groups".
- *
- * @since 1.0.0
- *
- * @todo Deprecate?
- */
-function bp_core_add_illegal_names() {
-	update_site_option( 'illegal_names', get_site_option( 'illegal_names' ), array() );
 }
 
 /**
@@ -912,7 +925,7 @@ function bp_core_add_illegal_names() {
  * @since 2.7.0 The `$component` parameter was made optional, with the current component
  *              as the fallback value.
  *
- * @param string $component Optional. Component name. Defaults to current component.
+ * @param string|null $component Optional. Component name. Defaults to current component.
  * @return string|bool Query argument on success. False on failure.
  */
 function bp_core_get_component_search_query_arg( $component = null ) {
@@ -1021,7 +1034,11 @@ function bp_core_redirect( $location = '', $status = 302 ) {
 	buddypress()->no_status_set = true;
 
 	wp_safe_redirect( $location, $status );
-	die;
+
+	// If PHPUnit is running, do not kill execution.
+	if ( ! defined( 'BP_TESTS_DIR' ) ) {
+		die;
+	}
 }
 
 /**
@@ -1181,7 +1198,11 @@ function bp_core_time_since( $older_date, $newer_date = false ) {
 	 *
 	 * @param string $value String representing the time since the older date.
 	 */
-	$ago_text       = apply_filters( 'bp_core_time_since_ago_text',       __( '%s ago',    'buddypress' ) );
+	$ago_text = apply_filters(
+		'bp_core_time_since_ago_text',
+		/* translators: %s: the human time diff. */
+		__( '%s ago', 'buddypress' )
+	);
 
 	// Array of time period chunks.
 	$chunks = array(
@@ -1242,24 +1263,31 @@ function bp_core_time_since( $older_date, $newer_date = false ) {
 			// Set output var.
 			switch ( $seconds ) {
 				case YEAR_IN_SECONDS :
+					/* translators: %s: the number of years. */
 					$output = sprintf( _n( '%s year',   '%s years',   $count, 'buddypress' ), $count );
 					break;
 				case 30 * DAY_IN_SECONDS :
+					/* translators: %s: the number of months. */
 					$output = sprintf( _n( '%s month',  '%s months',  $count, 'buddypress' ), $count );
 					break;
 				case WEEK_IN_SECONDS :
+					/* translators: %s: the number of weeks. */
 					$output = sprintf( _n( '%s week',   '%s weeks',   $count, 'buddypress' ), $count );
 					break;
 				case DAY_IN_SECONDS :
+					/* translators: %s: the number of days. */
 					$output = sprintf( _n( '%s day',    '%s days',    $count, 'buddypress' ), $count );
 					break;
 				case HOUR_IN_SECONDS :
+					/* translators: %s: the number of hours. */
 					$output = sprintf( _n( '%s hour',   '%s hours',   $count, 'buddypress' ), $count );
 					break;
 				case MINUTE_IN_SECONDS :
+					/* translators: %s: the number of minutes. */
 					$output = sprintf( _n( '%s minute', '%s minutes', $count, 'buddypress' ), $count );
 					break;
 				default:
+					/* translators: %s: the number of seconds. */
 					$output = sprintf( _n( '%s second', '%s seconds', $count, 'buddypress' ), $count );
 			}
 
@@ -1279,21 +1307,27 @@ function bp_core_time_since( $older_date, $newer_date = false ) {
 
 					switch ( $seconds2 ) {
 						case 30 * DAY_IN_SECONDS :
+							/* translators: %s: the number of months. */
 							$output .= sprintf( _n( '%s month',  '%s months',  $count2, 'buddypress' ), $count2 );
 							break;
 						case WEEK_IN_SECONDS :
+							/* translators: %s: the number of weeks. */
 							$output .= sprintf( _n( '%s week',   '%s weeks',   $count2, 'buddypress' ), $count2 );
 							break;
 						case DAY_IN_SECONDS :
+							/* translators: %s: the number of days. */
 							$output .= sprintf( _n( '%s day',    '%s days',    $count2, 'buddypress' ), $count2 );
 							break;
 						case HOUR_IN_SECONDS :
+							/* translators: %s: the number of hours. */
 							$output .= sprintf( _n( '%s hour',   '%s hours',   $count2, 'buddypress' ), $count2 );
 							break;
 						case MINUTE_IN_SECONDS :
+							/* translators: %s: the number of minutes. */
 							$output .= sprintf( _n( '%s minute', '%s minutes', $count2, 'buddypress' ), $count2 );
 							break;
 						default:
+							/* translators: %s: the number of seconds. */
 							$output .= sprintf( _n( '%s second', '%s seconds', $count2, 'buddypress' ), $count2 );
 					}
 				}
@@ -1329,7 +1363,7 @@ function bp_core_time_since( $older_date, $newer_date = false ) {
  * @since 2.7.0
  *
  * @param string String of date to convert. Timezone should be UTC before using this.
- * @return string
+ * @return string|null
  */
  function bp_core_iso8601_date( $timestamp = '' ) {
 	echo bp_core_get_iso8601_date( $timestamp );
@@ -1402,7 +1436,6 @@ function bp_core_add_message( $message, $type = '' ) {
  * so that the message is not shown to the user multiple times.
  *
  * @since 1.1.0
- *
  */
 function bp_core_setup_message() {
 
@@ -1486,9 +1519,7 @@ function bp_core_render_message() {
  *
  * @since 1.0.0
  *
- *       usermeta table.
- *
- * @return bool|null Returns false if there is nothing to do.
+ * @return false|null Returns false if there is nothing to do.
  */
 function bp_core_record_activity() {
 
@@ -1543,17 +1574,15 @@ add_action( 'wp_head', 'bp_core_record_activity' );
  *
  * @since 1.0.0
  *
- *       representation of the time elapsed.
- *
  * @param int|string $last_activity_date The date of last activity.
- * @param string     $string             A sprintf()-able statement of the form 'active %s'.
+ * @param string     $string             A sprintf()-able statement of the form 'Active %s'.
  * @return string $last_active A string of the form '3 years ago'.
  */
 function bp_core_get_last_activity( $last_activity_date = '', $string = '' ) {
 
 	// Setup a default string if none was passed.
 	$string = empty( $string )
-		? '%s'     // Gettext placeholder.
+		? '%s'     // Gettext library's placeholder.
 		: $string;
 
 	// Use the string if a last activity date was passed.
@@ -1568,7 +1597,7 @@ function bp_core_get_last_activity( $last_activity_date = '', $string = '' ) {
 	 *
 	 * @param string $last_active        Last activity string based on time since date given.
 	 * @param string $last_activity_date The date of last activity.
-	 * @param string $string             A sprintf()-able statement of the form 'active %s'.
+	 * @param string $string             A sprintf()-able statement of the form 'Active %s'.
 	 */
 	return apply_filters( 'bp_core_get_last_activity', $last_active, $last_activity_date, $string );
 }
@@ -1578,7 +1607,7 @@ function bp_core_get_last_activity( $last_activity_date = '', $string = '' ) {
 /**
  * Get the meta_key for a given piece of user metadata
  *
- * BuddyPress stores a number of pieces of userdata in the WordPress central
+ * BuddyPress stores a number of pieces of user data in the WordPress central
  * usermeta table. In order to allow plugins to enable multiple instances of
  * BuddyPress on a single WP installation, BP's usermeta keys are filtered
  * through this function, so that they can be altered on the fly.
@@ -1729,26 +1758,6 @@ function bp_use_embed_in_activity_replies() {
 }
 
 /**
- * Are oembeds allowed in forum posts?
- *
- * @since 1.5.0
- *
- * @return bool False when forum post embed support is disabled; true when
- *              enabled. Default: true.
- */
-function bp_use_embed_in_forum_posts() {
-
-	/**
-	 * Filters whether or not oEmbeds are allowed in forum posts.
-	 *
-	 * @since 1.5.0
-	 *
-	 * @param bool $value Whether or not oEmbeds are allowed.
-	 */
-	return apply_filters( 'bp_use_embed_in_forum_posts', !defined( 'BP_EMBED_DISABLE_FORUM_POSTS' ) || !BP_EMBED_DISABLE_FORUM_POSTS );
-}
-
-/**
  * Are oembeds allowed in private messages?
  *
  * @since 1.5.0
@@ -1776,7 +1785,7 @@ function bp_use_embed_in_private_messages() {
  * @param string     $content The content to check.
  * @param string|int $type    The type to check. Can also use a bitmask. See the class constants in the
  *                             BP_Media_Extractor class for more info.
- * @return array|bool          If media exists, will return array of media metadata. Else, boolean false.
+ * @return false|array If media exists, will return array of media metadata. Else, boolean false.
  */
 function bp_core_extract_media_from_content( $content = '', $type = 'all' ) {
 	if ( is_string( $type ) ) {
@@ -2354,11 +2363,6 @@ function bp_core_action_search_site( $slug = '' ) {
 				$slug = bp_is_active( 'blogs' )  ? bp_get_blogs_root_slug()  : '';
 				break;
 
-			case 'forums':
-				$slug = bp_is_active( 'forums' ) ? bp_get_forums_root_slug() : '';
-				$query_string = '/?fs=';
-				break;
-
 			case 'groups':
 				$slug = bp_is_active( 'groups' ) ? bp_get_groups_root_slug() : '';
 				break;
@@ -2462,10 +2466,6 @@ function bp_core_get_components( $type = 'all' ) {
 	);
 
 	$retired_components = array(
-		'forums' => array(
-			'title'       => __( 'Group Forums', 'buddypress' ),
-			'description' => sprintf( __( 'BuddyPress Forums are retired. Use %s.', 'buddypress' ), '<a href="https://bbpress.org/">bbPress</a>' )
-		),
 	);
 
 	$optional_components = array(
@@ -2496,10 +2496,6 @@ function bp_core_get_components( $type = 'all' ) {
 		'groups'   => array(
 			'title'       => __( 'User Groups', 'buddypress' ),
 			'description' => __( 'Groups allow your users to organize themselves into specific public, private or hidden sections with separate activity streams and member listings.', 'buddypress' )
-		),
-		'forums'   => array(
-			'title'       => __( 'Group Forums (Legacy)', 'buddypress' ),
-			'description' => __( 'Group forums allow for focused, bulletin-board style conversations.', 'buddypress' )
 		),
 		'blogs'    => array(
 			'title'       => __( 'Site Tracking', 'buddypress' ),
@@ -2561,14 +2557,15 @@ function bp_core_get_components( $type = 'all' ) {
  * @return mixed A URL or an array of dummy pages.
  */
 function bp_nav_menu_get_loggedin_pages() {
+	$bp = buddypress();
 
 	// Try to catch the cached version first.
-	if ( ! empty( buddypress()->wp_nav_menu_items->loggedin ) ) {
-		return buddypress()->wp_nav_menu_items->loggedin;
+	if ( ! empty( $bp->wp_nav_menu_items->loggedin ) ) {
+		return $bp->wp_nav_menu_items->loggedin;
 	}
 
 	// Pull up a list of items registered in BP's primary nav for the member.
-	$bp_menu_items = buddypress()->members->nav->get_primary();
+	$bp_menu_items = $bp->members->nav->get_primary();
 
 	// Some BP nav menu items will not be represented in bp_nav, because
 	// they are not real BP components. We add them manually here.
@@ -2596,18 +2593,18 @@ function bp_nav_menu_get_loggedin_pages() {
 			'post_author'    => 0,
 			'post_date'      => 0,
 			'post_excerpt'   => $bp_item['slug'],
-			'post_type'      => 'page',
+			'post_type'      => 'bp_nav_menu_item',
 			'post_status'    => 'publish',
 			'comment_status' => 'closed',
 			'guid'           => $bp_item['link']
 		);
 	}
 
-	if ( empty( buddypress()->wp_nav_menu_items ) ) {
+	if ( empty( $bp->wp_nav_menu_items ) ) {
 		buddypress()->wp_nav_menu_items = new stdClass;
 	}
 
-	buddypress()->wp_nav_menu_items->loggedin = $page_args;
+	$bp->wp_nav_menu_items->loggedin = $page_args;
 
 	return $page_args;
 }
@@ -2627,10 +2624,11 @@ function bp_nav_menu_get_loggedin_pages() {
  * @return mixed A URL or an array of dummy pages.
  */
 function bp_nav_menu_get_loggedout_pages() {
+	$bp = buddypress();
 
 	// Try to catch the cached version first.
-	if ( ! empty( buddypress()->wp_nav_menu_items->loggedout ) ) {
-		return buddypress()->wp_nav_menu_items->loggedout;
+	if ( ! empty( $bp->wp_nav_menu_items->loggedout ) ) {
+		return $bp->wp_nav_menu_items->loggedout;
 	}
 
 	$bp_menu_items = array();
@@ -2670,18 +2668,18 @@ function bp_nav_menu_get_loggedout_pages() {
 			'post_author'    => 0,
 			'post_date'      => 0,
 			'post_excerpt'   => $bp_item['slug'],
-			'post_type'      => 'page',
+			'post_type'      => 'bp_nav_menu_item',
 			'post_status'    => 'publish',
 			'comment_status' => 'closed',
 			'guid'           => $bp_item['link']
 		);
 	}
 
-	if ( empty( buddypress()->wp_nav_menu_items ) ) {
-		buddypress()->wp_nav_menu_items = new stdClass;
+	if ( empty( $bp->wp_nav_menu_items ) ) {
+		$bp->wp_nav_menu_items = new stdClass;
 	}
 
-	buddypress()->wp_nav_menu_items->loggedout = $page_args;
+	$bp->wp_nav_menu_items->loggedout = $page_args;
 
 	return $page_args;
 }
@@ -2750,7 +2748,7 @@ function bp_core_get_suggestions( $args ) {
 		 * @since 2.1.0
 		 *
 		 * @param string $value Custom class to use. Default: none.
-		 * @param array  $args  Array of arguments for sugggestions.
+		 * @param array  $args  Array of arguments for suggestions.
 		 */
 		$class = apply_filters( 'bp_suggestions_services', '', $args );
 	}
@@ -2779,6 +2777,40 @@ function bp_core_get_suggestions( $args ) {
 	 */
 	return apply_filters( 'bp_core_get_suggestions', $retval, $args );
 }
+
+/**
+ * AJAX endpoint for Suggestions API lookups.
+ *
+ * @since 2.1.0
+ * @since 4.0.0 Moved here to make sure this function is available
+ *              even if the Activity component is not active.
+ */
+function bp_ajax_get_suggestions() {
+	if ( ! bp_is_user_active() || empty( $_GET['term'] ) || empty( $_GET['type'] ) ) {
+		wp_send_json_error( 'missing_parameter' );
+		exit;
+	}
+
+	$args = array(
+		'term' => sanitize_text_field( $_GET['term'] ),
+		'type' => sanitize_text_field( $_GET['type'] ),
+	);
+
+	// Support per-Group suggestions.
+	if ( ! empty( $_GET['group-id'] ) ) {
+		$args['group_id'] = absint( $_GET['group-id'] );
+	}
+
+	$results = bp_core_get_suggestions( $args );
+
+	if ( is_wp_error( $results ) ) {
+		wp_send_json_error( $results->get_error_message() );
+		exit;
+	}
+
+	wp_send_json_success( $results );
+}
+add_action( 'wp_ajax_bp_get_suggestions', 'bp_ajax_get_suggestions' );
 
 /**
  * Set data from the BP root blog's upload directory.
@@ -2918,6 +2950,41 @@ function bp_get_email_post_type_supports() {
 /** Taxonomies *****************************************************************/
 
 /**
+ * Returns the BP Taxonomy common arguments.
+ *
+ * @since 7.0.0
+ *
+ * @return array The BP Taxonomy common arguments.
+ */
+function bp_get_taxonomy_common_args() {
+	return array(
+		'public'        => false,
+		'show_in_rest'  => false,
+		'query_var'     => false,
+		'rewrite'       => false,
+		'show_in_menu'  => false,
+		'show_tagcloud' => false,
+		'show_ui'       => bp_is_root_blog() && bp_current_user_can( 'bp_moderate' ),
+	);
+}
+
+/**
+ * Returns the BP Taxonomy common labels.
+ *
+ * @since 7.0.0
+ *
+ * @return array The BP Taxonomy common labels.
+ */
+function bp_get_taxonomy_common_labels() {
+	return array(
+		'bp_type_name'           => _x( 'Plural Name', 'BP Type name label', 'buddypress' ),
+		'bp_type_singular_name'  => _x( 'Singular name', 'BP Type singular name label', 'buddypress' ),
+		'bp_type_has_directory'  => _x( 'Has Directory View', 'BP Type has directory checkbox label', 'buddypress' ),
+		'bp_type_directory_slug' => _x( 'Custom type directory slug', 'BP Type slug label', 'buddypress' ),
+	);
+}
+
+/**
  * Output the name of the email type taxonomy.
  *
  * @since 2.5.0
@@ -2979,6 +3046,233 @@ function bp_get_email_tax_type_labels() {
 	) );
 }
 
+/**
+ * Return arguments used by the email type taxonomy.
+ *
+ * @since 7.0.0
+ *
+ * @return array
+ */
+function bp_get_email_tax_type_args() {
+
+	/**
+	 * Filters emails type taxonomy args.
+	 *
+	 * @since 7.0.0
+	 *
+	 * @param array $value Associative array (key => arg).
+	 */
+	return apply_filters(
+		'bp_register_email_tax_type',
+		array_merge(
+			array(
+				'description'   => _x( 'BuddyPress email types', 'email type taxonomy description', 'buddypress' ),
+				'labels'        => bp_get_email_tax_type_labels(),
+				'meta_box_cb'   => 'bp_email_tax_type_metabox',
+			),
+			bp_get_taxonomy_common_args()
+		)
+	);
+}
+
+/**
+ * Returns the default BuddyPress type metadata schema.
+ *
+ * @since 7.0.0
+ *
+ * @param  boolean $suppress_filters Whether to suppress filters. Default `false`.
+ * @param  string  $type_taxonomy    Optional. the Type's taxonomy name.
+ * @return array                     The default BuddyPress type metadata schema.
+ */
+function bp_get_type_metadata_schema( $suppress_filters = false, $type_taxonomy = '' ) {
+	$schema = array(
+		'bp_type_singular_name' => array(
+			'description'       => __( 'The name of this type in singular form. ', 'buddypress' ),
+			'type'              => 'string',
+			'single'            => true,
+			'sanitize_callback' => 'sanitize_text_field',
+		),
+		'bp_type_name' => array(
+			'description'       => __( 'The name of this type in plural form.', 'buddypress' ),
+			'type'              => 'string',
+			'single'            => true,
+			'sanitize_callback' => 'sanitize_text_field',
+		),
+		'bp_type_has_directory' => array(
+			'description'       => __( 'Make a list matching this type available on the directory.', 'buddypress' ),
+			'type'              => 'boolean',
+			'single'            => true,
+			'sanitize_callback' => 'absint',
+		),
+		'bp_type_directory_slug' => array(
+			'label'             => __( 'Type slug', 'buddypress' ),
+			'description'       => __( 'Enter if you want the type slug to be different from its ID.', 'buddypress' ),
+			'type'              => 'string',
+			'single'            => true,
+			'sanitize_callback' => 'sanitize_title',
+		),
+	);
+
+	if ( true === $suppress_filters ) {
+		return $schema;
+	}
+
+	/**
+	 * Filter here to add new meta to the BuddyPress type metadata.
+	 *
+	 * @since 7.0.0
+	 *
+	 * @param array  $schema        Associative array (name => arguments).
+	 * @param string $type_taxonomy The Type's taxonomy name.
+	 */
+	return apply_filters( 'bp_get_type_metadata_schema', $schema, $type_taxonomy );
+}
+
+/**
+ * Registers a meta key for BuddyPress types.
+ *
+ * @since 7.0.0
+ *
+ * @param string $type_tax The BuddyPress type taxonomy.
+ * @param string $meta_key The meta key to register.
+ * @param array  $args     Data used to describe the meta key when registered. See
+ *                         {@see register_meta()} for a list of supported arguments.
+ * @return bool True if the meta key was successfully registered, false if not.
+ */
+function bp_register_type_meta( $type_tax, $meta_key, array $args ) {
+	$taxonomies = wp_list_pluck( bp_get_default_taxonomies(), 'component' );
+
+	if ( ! isset( $taxonomies[ $type_tax ] ) ) {
+		return false;
+	}
+
+	// register_term_meta() was introduced in WP 4.9.8.
+	if ( ! bp_is_running_wp( '4.9.8' ) ) {
+		$args['object_subtype'] = $type_tax;
+
+		return register_meta( 'term', $meta_key, $args );
+	}
+
+	return register_term_meta( $type_tax, $meta_key, $args );
+}
+
+/**
+ * Update a list of metadata for a given type ID and a given taxonomy.
+ *
+ * @since 7.0.0
+ *
+ * @param  integer $type_id    The database ID of the BP Type.
+ * @param  string  $taxonomy   The BP Type taxonomy.
+ * @param  array   $type_metas An associative array (meta_key=>meta_value).
+ * @return boolean             False on failure. True otherwise.
+ */
+function bp_update_type_metadata( $type_id = 0, $taxonomy = '', $type_metas = array() ) {
+	if ( ! $type_id || ! $taxonomy || ! is_array( $type_metas ) ) {
+		return false;
+	}
+
+	foreach ( $type_metas as $meta_key => $meta_value ) {
+		if ( ! registered_meta_key_exists( 'term', $meta_key, $taxonomy ) ) {
+			continue;
+		}
+
+		update_term_meta( $type_id, $meta_key, $meta_value );
+	}
+
+	return true;
+}
+
+/**
+ * Get types for a given BP Taxonomy.
+ *
+ * @since 7.0.0
+ *
+ * @param string $taxonomy The taxonomy to transform terms in types for.
+ * @param array  $types    Existing types to merge with the types found into the database.
+ *                         For instance this function is used internally to merge Group/Member
+ *                         types registered using code with the ones created by the administrator
+ *                         from the Group/Member types Administration screen. If not provided, only
+ *                         Types created by the administrator will be returned.
+ *                         Optional.
+ * @return array           The types of the given taxonomy.
+ */
+function bp_get_taxonomy_types( $taxonomy = '', $types = array() ) {
+	if ( ! $taxonomy ) {
+		return $types;
+	}
+
+	$db_types = wp_cache_get( $taxonomy, 'bp_object_terms' );
+
+	if ( ! $db_types ) {
+		$terms = bp_get_terms(
+			array(
+				'taxonomy' => $taxonomy,
+			)
+		);
+
+		if ( ! is_array( $terms ) || ! $terms ) {
+			return $types;
+		}
+
+		$type_metadata = array_keys( get_registered_meta_keys( 'term', $taxonomy ) );
+
+		foreach ( $terms as $term ) {
+			$type_name                      = $term->name;
+			$db_types[ $type_name ]         = new stdClass();
+			$db_types[ $type_name ]->db_id  = $term->term_id;
+			$db_types[ $type_name ]->labels = array();
+			$db_types[ $type_name ]->name   = $type_name;
+
+			if ( $type_metadata ) {
+				foreach ( $type_metadata as $meta_key ) {
+					$type_key = str_replace( 'bp_type_', '', $meta_key );
+					if ( in_array( $type_key, array( 'name', 'singular_name' ), true ) ) {
+						$db_types[ $type_name ]->labels[ $type_key ] = get_term_meta( $term->term_id, $meta_key, true );
+					} else {
+						$db_types[ $type_name ]->{$type_key} = get_term_meta( $term->term_id, $meta_key, true );
+					}
+				}
+
+				if ( ! empty( $db_types[ $type_name ]->has_directory ) && empty( $db_types[ $type_name ]->directory_slug ) ) {
+					$db_types[ $type_name ]->directory_slug = $term->slug;
+				}
+			}
+		}
+
+		wp_cache_set( $taxonomy, $db_types, 'bp_object_terms' );
+	}
+
+	if ( is_array( $db_types ) ) {
+		foreach ( $db_types as $db_type_name => $db_type ) {
+			// Override props of registered by code types if customized by the admun user.
+			if ( isset( $types[ $db_type_name ] ) && isset( $types[ $db_type_name ]->code ) && $types[ $db_type_name ]->code ) {
+				// Merge Labels.
+				if ( $db_type->labels ) {
+					foreach ( $db_type->labels as $key_label => $value_label ) {
+						if ( '' !== $value_label ) {
+							$types[ $db_type_name ]->labels[ $key_label ] = $value_label;
+						}
+					}
+				}
+
+				// Merge other properties.
+				foreach ( get_object_vars( $types[ $db_type_name ] ) as $key_prop => $value_prop ) {
+					if ( 'labels' === $key_prop || 'name' === $key_prop ) {
+						continue;
+					}
+
+					if ( isset( $db_type->{$key_prop} ) && '' !== $db_type->{$key_prop} ) {
+						$types[ $db_type_name  ]->{$key_prop} = $db_type->{$key_prop};
+					}
+				}
+
+				unset( $db_types[ $db_type_name ] );
+			}
+		}
+	}
+
+	return array_merge( $types, (array) $db_types );
+}
 
 /** Email *****************************************************************/
 
@@ -3087,11 +3381,11 @@ function bp_get_email( $email_type ) {
  *
  * @param string                   $email_type Type of email being sent.
  * @param string|array|int|WP_User $to         Either a email address, user ID, WP_User object,
- *                                             or an array containg the address and name.
+ *                                             or an array containing the address and name.
  * @param array                    $args {
  *     Optional. Array of extra parameters.
  *
- *     @type array $tokens Optional. Assocative arrays of string replacements for the email.
+ *     @type array $tokens Optional. Associative arrays of string replacements for the email.
  * }
  * @return bool|WP_Error True if the email was sent successfully. Otherwise, a WP_Error object
  *                       describing why the email failed to send. The contents will vary based
@@ -3132,7 +3426,12 @@ function bp_send_email( $email_type, $to, $args = array() ) {
 	}
 
 	// From, subject, content are set automatically.
-	$email->set_to( $to );
+	if ( 'settings-verify-email-change' === $email_type && isset( $args['tokens']['displayname'] ) ) {
+		$email->set_to( $to, $args['tokens']['displayname'] );
+	} else {
+		$email->set_to( $to );
+	}
+
 	$email->set_tokens( $args['tokens'] );
 
 	/**
@@ -3143,11 +3442,11 @@ function bp_send_email( $email_type, $to, $args = array() ) {
 	 * @param BP_Email                 $email      The email (object) about to be sent.
 	 * @param string                   $email_type Type of email being sent.
 	 * @param string|array|int|WP_User $to         Either a email address, user ID, WP_User object,
-	 *                                             or an array containg the address and name.
+	 *                                             or an array containing the address and name.
      * @param array                    $args {
 	 *     Optional. Array of extra parameters.
 	 *
-	 *     @type array $tokens Optional. Assocative arrays of string replacements for the email.
+	 *     @type array $tokens Optional. Associative arrays of string replacements for the email.
 	 * }
 	 */
 	do_action_ref_array( 'bp_send_email', array( &$email, $email_type, $to, $args ) );
@@ -3197,12 +3496,12 @@ function bp_send_email( $email_type, $to, $args = array() ) {
 	 * @param array        $args {
 	 *     Optional. Array of extra parameters.
 	 *
-	 *     @type array $tokens Optional. Assocative arrays of string replacements for the email.
+	 *     @type array $tokens Optional. Associative arrays of string replacements for the email.
 	 * }
 	 */
 	$delivery_class = apply_filters( 'bp_send_email_delivery_class', 'BP_PHPMailer', $email_type, $to, $args );
 	if ( ! class_exists( $delivery_class ) ) {
-		return new WP_Error( 'missing_class', __CLASS__, $this );
+		return new WP_Error( 'missing_class', 'No class found by that name', $delivery_class );
 	}
 
 	$delivery = new $delivery_class();
@@ -3224,7 +3523,7 @@ function bp_send_email( $email_type, $to, $args = array() ) {
 	} else {
 
 		/**
-		 * Fires after BuddyPress has succesfully sent an email.
+		 * Fires after BuddyPress has successfully sent an email.
 		 *
 		 * @since 2.5.0
 		 *
@@ -3241,10 +3540,32 @@ function bp_send_email( $email_type, $to, $args = array() ) {
  * Return email appearance settings.
  *
  * @since 2.5.0
+ * @since 3.0.0 Added "direction" parameter for LTR/RTL email support, and
+ *              "link_text_color" to override that in the email body.
  *
  * @return array
  */
 function bp_email_get_appearance_settings() {
+	$footer_text = array(
+		sprintf(
+			/* translators: 1. Copyright year, 2. Site name */
+			_x( '&copy; %1$s %2$s', 'copyright text for email footers', 'buddypress' ),
+			date_i18n( 'Y' ),
+			bp_get_option( 'blogname' )
+		)
+	);
+
+	if ( bp_is_running_wp( '4.9.6' ) ) {
+		$privacy_policy_url = get_privacy_policy_url();
+		if ( $privacy_policy_url ) {
+			$footer_text[] = sprintf(
+				'<a href="%s">%s</a>',
+				esc_url( $privacy_policy_url ),
+				esc_html__( 'Privacy Policy', 'buddypress' )
+			);
+		}
+	}
+
 	$default_args = array(
 		'body_bg'           => '#FFFFFF',
 		'body_text_color'   => '#555555',
@@ -3257,20 +3578,23 @@ function bp_email_get_appearance_settings() {
 		'highlight_color'   => '#D84800',
 		'header_text_color' => '#000000',
 		'header_text_size'  => 30,
+		'direction'         => is_rtl() ? 'right' : 'left',
 
-		'footer_text' => sprintf(
-			/* translators: email disclaimer, e.g. "© 2016 Site Name". */
-			_x( '&copy; %s %s', 'email', 'buddypress' ),
-			date_i18n( 'Y' ),
-			bp_get_option( 'blogname' )
-		),
+		'footer_text' => implode( ' &middot; ', $footer_text ),
 	);
 
-	return bp_parse_args(
+	$options = bp_parse_args(
 		bp_get_option( 'bp_email_options', array() ),
 		$default_args,
 		'email_appearance_settings'
 	);
+
+	// Link text colour defaults to the highlight colour.
+	if ( ! isset( $options['link_text_color'] ) ) {
+		$options['link_text_color'] = $options['highlight_color'];
+	}
+
+	return $options;
 }
 
 /**
@@ -3293,6 +3617,7 @@ function bp_email_get_template( WP_Post $object ) {
 	 * @param WP_Post $object WP_Post object.
 	 */
 	return apply_filters( 'bp_email_get_template', array(
+		"assets/emails/{$single}-{$object->post_name}.php",
 		"{$single}-{$object->post_name}.php",
 		"{$single}.php",
 		"assets/emails/{$single}.php",
@@ -3350,7 +3675,15 @@ function bp_core_replace_tokens_in_text( $text, $tokens ) {
  * @return array
  */
 function bp_email_get_schema() {
-	return array(
+
+	/**
+	 * Filters the list of `bp_email_get_schema()` allowing anyone to add/remove emails.
+	 *
+	 * @since 7.0.0
+	 *
+	 * @param array $emails The array of emails schema.
+	 */
+	return (array) apply_filters( 'bp_email_get_schema', array(
 		'activity-comment' => array(
 			/* translators: do not remove {} brackets or translate its contents. */
 			'post_title'   => __( '[{{{site.name}}}] {{poster.name}} replied to one of your updates', 'buddypress' ),
@@ -3387,9 +3720,9 @@ function bp_email_get_schema() {
 			/* translators: do not remove {} brackets or translate its contents. */
 			'post_title'   => __( '[{{{site.name}}}] Activate your account', 'buddypress' ),
 			/* translators: do not remove {} brackets or translate its contents. */
-			'post_content' => __( "Thanks for registering!\n\nTo complete the activation of your account, go to the following link: <a href=\"{{{activate.url}}}\">{{{activate.url}}}</a>", 'buddypress' ),
+			'post_content' => __( "Thanks for registering!\n\nTo complete the activation of your account, go to the following link and click on the <strong>Activate</strong> button:\n<a href=\"{{{activate.url}}}\">{{{activate.url}}}</a>\n\nIf the 'Activation Key' field is empty, copy and paste the following into the field - {{key}}", 'buddypress' ),
 			/* translators: do not remove {} brackets or translate its contents. */
-			'post_excerpt' => __( "Thanks for registering!\n\nTo complete the activation of your account, go to the following link: {{{activate.url}}}", 'buddypress' ),
+			'post_excerpt' => __( "Thanks for registering!\n\nTo complete the activation of your account, go to the following link and click on the 'Activate' button: {{{activate.url}}}\n\nIf the 'Activation Key' field is empty, copy and paste the following into the field - {{key}}", 'buddypress' )
 		),
 		'core-user-registration-with-blog' => array(
 			/* translators: do not remove {} brackets or translate its contents. */
@@ -3398,6 +3731,9 @@ function bp_email_get_schema() {
 			'post_content' => __( "Thanks for registering!\n\nTo complete the activation of your account and site, go to the following link: <a href=\"{{{activate-site.url}}}\">{{{activate-site.url}}}</a>.\n\nAfter you activate, you can visit your site at <a href=\"{{{user-site.url}}}\">{{{user-site.url}}}</a>.", 'buddypress' ),
 			/* translators: do not remove {} brackets or translate its contents. */
 			'post_excerpt' => __( "Thanks for registering!\n\nTo complete the activation of your account and site, go to the following link: {{{activate-site.url}}}\n\nAfter you activate, you can visit your site at {{{user-site.url}}}.", 'buddypress' ),
+			'args'         => array(
+				'multisite' => true,
+			),
 		),
 		'friends-request' => array(
 			/* translators: do not remove {} brackets or translate its contents. */
@@ -3427,7 +3763,7 @@ function bp_email_get_schema() {
 			/* translators: do not remove {} brackets or translate its contents. */
 			'post_title'   => __( '[{{{site.name}}}] You have an invitation to the group: "{{group.name}}"', 'buddypress' ),
 			/* translators: do not remove {} brackets or translate its contents. */
-			'post_content' => __( "<a href=\"{{{inviter.url}}}\">{{inviter.name}}</a> has invited you to join the group: &quot;{{group.name}}&quot;.\n<a href=\"{{{invites.url}}}\">Go here to accept your invitation</a> or <a href=\"{{{group.url}}}\">visit the group</a> to learn more.", 'buddypress' ),
+			'post_content' => __( "<a href=\"{{{inviter.url}}}\">{{inviter.name}}</a> has invited you to join the group: &quot;{{group.name}}&quot;.\n{{invite.message}}\n<a href=\"{{{invites.url}}}\">Go here to accept your invitation</a> or <a href=\"{{{group.url}}}\">visit the group</a> to learn more.", 'buddypress' ),
 			/* translators: do not remove {} brackets or translate its contents. */
 			'post_excerpt' => __( "{{inviter.name}} has invited you to join the group: \"{{group.name}}\".\n\nTo accept your invitation, visit: {{{invites.url}}}\n\nTo learn more about the group, visit: {{{group.url}}}.\nTo view {{inviter.name}}'s profile, visit: {{{inviter.url}}}", 'buddypress' ),
 		),
@@ -3443,7 +3779,7 @@ function bp_email_get_schema() {
 			/* translators: do not remove {} brackets or translate its contents. */
 			'post_title'   => __( '[{{{site.name}}}] Membership request for group: {{group.name}}', 'buddypress' ),
 			/* translators: do not remove {} brackets or translate its contents. */
-			'post_content' => __( "<a href=\"{{{profile.url}}}\">{{requesting-user.name}}</a> wants to join the group &quot;{{group.name}}&quot;. As you are an administrator of this group, you must either accept or reject the membership request.\n\n<a href=\"{{{group-requests.url}}}\">Go here to manage this</a> and all other pending requests.", 'buddypress' ),
+			'post_content' => __( "<a href=\"{{{profile.url}}}\">{{requesting-user.name}}</a> wants to join the group &quot;{{group.name}}&quot;.\n {{request.message}}\n As you are an administrator of this group, you must either accept or reject the membership request.\n\n<a href=\"{{{group-requests.url}}}\">Go here to manage this</a> and all other pending requests.", 'buddypress' ),
 			/* translators: do not remove {} brackets or translate its contents. */
 			'post_excerpt' => __( "{{requesting-user.name}} wants to join the group \"{{group.name}}\". As you are the administrator of this group, you must either accept or reject the membership request.\n\nTo manage this and all other pending requests, visit: {{{group-requests.url}}}\n\nTo view {{requesting-user.name}}'s profile, visit: {{{profile.url}}}", 'buddypress' ),
 		),
@@ -3479,7 +3815,7 @@ function bp_email_get_schema() {
 			/* translators: do not remove {} brackets or translate its contents. */
 			'post_excerpt' => __( "Your membership request for the group \"{{group.name}}\" has been rejected.\n\nTo request membership again, visit: {{{group.url}}}", 'buddypress' ),
 		),
-	);
+	) );
 }
 
 /**
@@ -3506,7 +3842,7 @@ function bp_email_get_type_schema( $field = 'description' ) {
 		'unsubscribe'	=> array(
 			'meta_key'	=> 'notification_activity_new_reply',
 			'message'	=> __( 'You will no longer receive emails when someone replies to an update or comment you posted.', 'buddypress' ),
-			),
+		),
 	);
 
 	$activity_comment_author = array(
@@ -3514,7 +3850,7 @@ function bp_email_get_type_schema( $field = 'description' ) {
 		'unsubscribe'	=> array(
 			'meta_key'	=> 'notification_activity_new_reply',
 			'message'	=> __( 'You will no longer receive emails when someone replies to an update or comment you posted.', 'buddypress' ),
-			),
+		),
 	);
 
 	$activity_at_message = array(
@@ -3567,27 +3903,11 @@ function bp_email_get_type_schema( $field = 'description' ) {
 		),
 	);
 
-	$groups_details_updated = array(
-		'description'	=> __( "A group's details were updated.", 'buddypress' ),
-		'unsubscribe'	=> array(
-			'meta_key'	=> 'notification_groups_group_updated',
-			'message'	=> __( 'You will no longer receive emails when one of your groups is updated.', 'buddypress' ),
-		),
-	);
-
 	$groups_invitation = array(
 		'description'	=> __( 'A member has sent a group invitation to the recipient.', 'buddypress' ),
 		'unsubscribe'	=> array(
 			'meta_key'	=> 'notification_groups_invite',
 			'message'	=> __( 'You will no longer receive emails when you are invited to join a group.', 'buddypress' ),
-		),
-	);
-
-	$groups_member_promoted = array(
-		'description'	=> __( "Recipient's status within a group has changed.", 'buddypress' ),
-		'unsubscribe'	=> array(
-			'meta_key'	=> 'notification_groups_admin_promotion',
-			'message'	=> __( 'You will no longer receive emails when you have been promoted in a group.', 'buddypress' ),
 		),
 	);
 
@@ -3676,13 +3996,13 @@ function bp_email_unsubscribe_handler() {
 
 	// Check required values.
 	if ( ! $raw_user_id || ! $raw_email_type || ! $raw_hash || ! array_key_exists( $raw_email_type, $emails ) ) {
-		$redirect_to = site_url( 'wp-login.php' );
+		$redirect_to = wp_login_url();
 		$result_msg  = __( 'Something has gone wrong.', 'buddypress' );
 		$unsub_msg   = __( 'Please log in and go to your settings to unsubscribe from notification emails.', 'buddypress' );
 
 	// Check valid hash.
 	} elseif ( ! hash_equals( $new_hash, $raw_hash ) ) {
-		$redirect_to = site_url( 'wp-login.php' );
+		$redirect_to = wp_login_url();
 		$result_msg  = __( 'Something has gone wrong.', 'buddypress' );
 		$unsub_msg   = __( 'Please log in and go to your settings to unsubscribe from notification emails.', 'buddypress' );
 
@@ -3752,7 +4072,7 @@ function bp_email_get_unsubscribe_link( $args ) {
 	$emails = bp_email_get_unsubscribe_type_schema();
 
 	if ( empty( $args['notification_type'] ) || ! array_key_exists( $args['notification_type'], $emails ) ) {
-		return site_url( 'wp-login.php' );
+		return wp_login_url();
 	}
 
 	$email_type  = $args['notification_type'];
@@ -3814,4 +4134,101 @@ function bp_email_get_unsubscribe_type_schema() {
 	 * @param array $emails The array of email types and their schema.
 	 */
 	return (array) apply_filters( 'bp_email_get_unsubscribe_type_schema', $emails );
+}
+
+/**
+ * Get BuddyPress content allowed tags.
+ *
+ * @since  3.0.0
+ *
+ * @global array $allowedtags KSES allowed HTML elements.
+ * @return array              BuddyPress content allowed tags.
+ */
+function bp_get_allowedtags() {
+	global $allowedtags;
+
+	return array_merge_recursive( $allowedtags, array(
+		'a' => array(
+			'aria-label'      => array(),
+			'class'           => array(),
+			'data-bp-tooltip' => array(),
+			'id'              => array(),
+			'rel'             => array(),
+		),
+		'img' => array(
+			'src'    => array(),
+			'alt'    => array(),
+			'width'  => array(),
+			'height' => array(),
+			'class'  => array(),
+			'id'     => array(),
+		),
+		'span'=> array(
+			'class'          => array(),
+			'data-livestamp' => array(),
+		),
+		'ul' => array(),
+		'ol' => array(),
+		'li' => array(),
+	) );
+}
+
+/**
+ * Remove script and style tags from a string.
+ *
+ * @since 3.0.1
+ *
+ * @param  string $string The string to strip tags from.
+ * @return string         The stripped tags string.
+ */
+function bp_strip_script_and_style_tags( $string ) {
+	return preg_replace( '@<(script|style)[^>]*?>.*?</\\1>@si', '', $string );
+}
+
+/**
+ * Checks whether the current installation is "large".
+ *
+ * By default, an installation counts as "large" if there are 10000 users or more.
+ * Filter 'bp_is_large_install' to adjust.
+ *
+ * @since 4.1.0
+ *
+ * @return bool
+ */
+function bp_is_large_install() {
+	// Use the Multisite function if available.
+	if ( function_exists( 'wp_is_large_network' ) ) {
+		$is_large = wp_is_large_network( 'users' );
+	} else {
+		$is_large = bp_core_get_total_member_count() > 10000;
+	}
+
+	/**
+	 * Filters whether the current installation is "large".
+	 *
+	 * @since 4.1.0
+	 *
+	 * @param bool $is_large True if the network is "large".
+	 */
+	return (bool) apply_filters( 'bp_is_large_install', $is_large );
+}
+
+/**
+ * Returns the upper limit on the "max" item count, for widgets that support it.
+ *
+ * @since 5.0.0
+ *
+ * @param string $widget_class Optional. Class name of the calling widget.
+ * @return int
+ */
+function bp_get_widget_max_count_limit( $widget_class = '' ) {
+	/**
+	 * Filters the upper limit on the "max" item count, for widgets that support it.
+	 *
+	 * @since 5.0.0
+	 *
+	 * @param int    $count        Defaults to 50.
+	 * @param string $widget_class Class name of the calling widget.
+	 */
+	return apply_filters( 'bp_get_widget_max_count_limit', 50, $widget_class );
 }

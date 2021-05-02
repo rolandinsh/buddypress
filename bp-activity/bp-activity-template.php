@@ -266,8 +266,8 @@ function bp_has_activities( $args = '' ) {
 		// Filtering
 		'user_id'           => $user_id,     // user_id to filter on.
 		'object'            => $object,      // Object to filter on e.g. groups, profile, status, friends.
-		'action'            => false,        // Action to filter on e.g. activity_update, new_forum_post, profile_updated.
-		'primary_id'        => $primary_id,  // Object ID to filter on e.g. a group_id or forum_id or blog_id etc.
+		'action'            => false,        // Action to filter on e.g. activity_update, profile_updated.
+		'primary_id'        => $primary_id,  // Object ID to filter on e.g. a group_id or blog_id etc.
 		'secondary_id'      => false,        // Secondary object ID to filter on e.g. a post_id.
 		'offset'            => false,        // Return only items >= this ID.
 		'since'             => false,        // Return only items recorded since this Y-m-d H:i:s date.
@@ -452,6 +452,7 @@ function bp_activity_pagination_count() {
 		if ( 1 == $activities_template->total_activity_count ) {
 			$message = __( 'Viewing 1 item', 'buddypress' );
 		} else {
+			/* translators: 1: the from number item. 2: the to number item. 3: the total number of items. */
 			$message = sprintf( _n( 'Viewing %1$s - %2$s of %3$s item', 'Viewing %1$s - %2$s of %3$s items', $activities_template->total_activity_count, 'buddypress' ), $from_num, $to_num, $total );
 		}
 
@@ -1034,7 +1035,11 @@ function bp_activity_avatar( $args = '' ) {
 		$dn_default  = isset( $current_activity_item->display_name ) ? $current_activity_item->display_name : '';
 
 		// Prepend some descriptive text to alt.
-		$alt_default = !empty( $dn_default ) ? sprintf( __( 'Profile picture of %s', 'buddypress' ), $dn_default ) : __( 'Profile picture', 'buddypress' );
+		$alt_default = __( 'Profile picture', 'buddypress' );
+		if ( ! empty( $dn_default ) ) {
+			/* translators: %s: member name */
+			$alt_default = sprintf( __( 'Profile picture of %s', 'buddypress' ), $dn_default );
+		}
 
 		$defaults = array(
 			'alt'     => $alt_default,
@@ -1182,6 +1187,7 @@ function bp_activity_secondary_avatar( $args = '' ) {
 					$alt = __( 'Group logo', 'buddypress' );
 
 					if ( ! empty( $name ) ) {
+						/* translators: %s: the Group name */
 						$alt = sprintf( __( 'Group logo of %s', 'buddypress' ), $name );
 					}
 				}
@@ -1193,6 +1199,7 @@ function bp_activity_secondary_avatar( $args = '' ) {
 				$link    = home_url();
 
 				if ( empty( $alt ) ) {
+					/* translators: %s: the blog name */
 					$alt = sprintf( __( 'Profile picture of the author of the site %s', 'buddypress' ), get_blog_option( $item_id, 'blogname' ) );
 				}
 
@@ -1203,6 +1210,7 @@ function bp_activity_secondary_avatar( $args = '' ) {
 				$link    = bp_core_get_userlink( $item_id, false, true );
 
 				if ( empty( $alt ) ) {
+					/* translators: %s: member name */
 					$alt = sprintf( __( 'Profile picture of %s', 'buddypress' ), bp_core_get_user_displayname( $activities_template->activity->secondary_item_id ) );
 				}
 
@@ -1214,6 +1222,7 @@ function bp_activity_secondary_avatar( $args = '' ) {
 				$link    = bp_core_get_userlink( $item_id, false, true );
 
 				if ( empty( $alt ) ) {
+					/* translators: %s: member name */
 					$alt = sprintf( __( 'Profile picture of %s', 'buddypress' ), $activities_template->activity->display_name );
 				}
 
@@ -1306,6 +1315,7 @@ function bp_activity_action( $args = array() ) {
 	 * Return the activity action.
 	 *
 	 * @since 1.2.0
+	 * @since 1.7.0 Introduce function parameter, $args.
 	 *
 	 * @global object $activities_template {@link BP_Activity_Template}
 	 *
@@ -1344,8 +1354,9 @@ function bp_activity_action( $args = array() ) {
 		 * Filters the activity action after the action has been inserted as meta.
 		 *
 		 * @since 1.2.0
+		 * @since 1.7.0 Now passes a 3rd parameter, $r, an array of arguments from the function.
 		 *
-		 * @param array $value Array containing the current action, the current activity, and the $args array passed into the function.
+		 * @param array $value Array containing the current action, the current activity, and the $r array passed into the function.
 		 */
 		return apply_filters_ref_array( 'bp_get_activity_action', array(
 			$action,
@@ -1493,7 +1504,7 @@ function bp_insert_activity_meta( $content = '' ) {
 
 		// Setup variables for activity meta.
 		$activity_permalink = bp_activity_get_permalink( $activities_template->activity->id, $activities_template->activity );
-		$activity_meta      = sprintf( '%1$s <a href="%2$s" class="view activity-time-since" title="%3$s">%4$s</a>',
+		$activity_meta      = sprintf( '%1$s <a href="%2$s" class="view activity-time-since bp-tooltip" data-bp-tooltip="%3$s">%4$s</a>',
 			$new_content,
 			$activity_permalink,
 			esc_attr__( 'View Discussion', 'buddypress' ),
@@ -1533,7 +1544,7 @@ function bp_insert_activity_meta( $content = '' ) {
  *
  * @global object $activities_template {@link BP_Activity_Template}
  *
- * @param BP_Activity_Activity $activity Optional. Falls back on the current item in the loop.
+ * @param false|BP_Activity_Activity $activity Optional. Falls back on the current item in the loop.
  * @return bool True if can delete, false otherwise.
  */
 function bp_activity_user_can_delete( $activity = false ) {
@@ -1567,8 +1578,13 @@ function bp_activity_user_can_delete( $activity = false ) {
 			$can_delete = true;
 		}
 
-		// Viewing a single item, and this user is an admin of that item.
-		if ( bp_is_single_item() && bp_is_item_admin() ) {
+		/*
+		 * Viewing a single item, and this user is an admin of that item.
+		 *
+		 * Group activity items are handled separately.
+		 * See bp_groups_filter_activity_user_can_delete().
+		 */
+		if ( 'groups' !== $activity->component && bp_is_single_item() && bp_is_item_admin() ) {
 			$can_delete = true;
 		}
 	}
@@ -2090,7 +2106,7 @@ function bp_activity_comment_delete_link() {
 	 *                      activity comment.
 	 */
 	function bp_get_activity_comment_delete_link() {
-		$link = wp_nonce_url( bp_get_activity_directory_permalink() . 'delete/' . bp_get_activity_comment_id() . '?cid=' . bp_get_activity_comment_id(), 'bp_activity_delete_link' );
+		$link = wp_nonce_url( trailingslashit( bp_get_activity_directory_permalink() . 'delete/' . bp_get_activity_comment_id() ) . '?cid=' . bp_get_activity_comment_id(), 'bp_activity_delete_link' );
 
 		/**
 		 * Filters the link used for deleting the activity comment currently being displayed.
@@ -2136,10 +2152,12 @@ function bp_activity_comment_content() {
 		 * Filters the content of the current activity comment.
 		 *
 		 * @since 1.2.0
+		 * @since 3.0.0 Added $context parameter to disambiguate from bp_get_activity_comment_content().
 		 *
 		 * @param string $content The content of the current activity comment.
+		 * @param string $context This filter's context ("get").
 		 */
-		return apply_filters( 'bp_activity_comment_content', $content );
+		return apply_filters( 'bp_activity_comment_content', $content, 'get' );
 	}
 
 /**
@@ -2167,7 +2185,16 @@ function bp_activity_comment_count() {
 
 		// Deprecated notice about $args.
 		if ( ! empty( $deprecated ) ) {
-			_deprecated_argument( __FUNCTION__, '1.2', sprintf( __( '%1$s no longer accepts arguments. See the inline documentation at %2$s for more details.', 'buddypress' ), __FUNCTION__, __FILE__ ) );
+			_deprecated_argument(
+				__FUNCTION__,
+				'1.2',
+				sprintf(
+					/* translators: 1: the name of the function. 2: the name of the file. */
+					__( '%1$s no longer accepts arguments. See the inline documentation at %2$s for more details.', 'buddypress' ),
+					__FUNCTION__,
+					__FILE__
+				)
+			);
 		}
 
 		// Get the count using the purpose-built recursive function.
@@ -2342,8 +2369,8 @@ function bp_activity_comment_form_nojs_display() {
 	 *
 	 * @global object $activities_template {@link BP_Activity_Template}
 	 *
-	 * @return string|bool The activity comment form no JavaScript
-	 *                     display CSS. False on failure.
+	 * @return string|false The activity comment form no JavaScript
+	 *                      display CSS. False on failure.
 	 */
 	function bp_get_activity_comment_form_nojs_display() {
 		global $activities_template;
@@ -2944,7 +2971,7 @@ function bp_activity_can_comment_reply( $comment = false ) {
 	 * @since 1.5.0
 	 *
 	 * @param bool   $can_comment Status on if activity reply can be commented on.
-	 * @param string $comment     Current comment being checked on.
+	 * @param object $comment     Current comment object being checked on.
 	 */
 	return (bool) apply_filters( 'bp_activity_can_comment_reply', $can_comment, $comment );
 }
@@ -3844,6 +3871,11 @@ function bp_activity_show_filters( $context = '' ) {
 			// Friends activity collapses two filters into one.
 			if ( in_array( $action['key'], array( 'friendship_accepted', 'friendship_created' ) ) ) {
 				$action['key'] = 'friendship_accepted,friendship_created';
+			}
+
+			// The 'activity_update' filter is already used by the Activity component.
+			if ( 'bp_groups_format_activity_action_group_activity_update' === $action['format_callback'] ) {
+				continue;
 			}
 
 			$filters[ $action['key'] ] = $action['label'];

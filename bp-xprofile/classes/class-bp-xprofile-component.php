@@ -67,22 +67,61 @@ class BP_XProfile_Component extends BP_Component {
 		$includes = array(
 			'cssjs',
 			'cache',
-			'actions',
-			'activity',
-			'screens',
 			'caps',
 			'filters',
-			'settings',
 			'template',
 			'functions',
-			'notifications',
 		);
 
+		// Conditional includes.
+		if ( bp_is_active( 'activity' ) ) {
+			$includes[] = 'activity';
+		}
+		if ( bp_is_active( 'notifications' ) ) {
+			$includes[] = 'notifications';
+		}
+		if ( bp_is_active( 'settings' ) ) {
+			$includes[] = 'settings';
+		}
 		if ( is_admin() ) {
 			$includes[] = 'admin';
 		}
 
 		parent::includes( $includes );
+	}
+
+	/**
+	 * Late includes method.
+	 *
+	 * Only load up certain code when on specific pages.
+	 *
+	 * @since 3.0.0
+	 */
+	public function late_includes() {
+		// Bail if PHPUnit is running.
+		if ( defined( 'BP_TESTS_DIR' ) ) {
+			return;
+		}
+
+		// Bail if not on a user page.
+		if ( ! bp_is_user() ) {
+			return;
+		}
+
+		// User nav.
+		if ( bp_is_profile_component() ) {
+			require $this->path . 'bp-xprofile/screens/public.php';
+
+			// Sub-nav items.
+			if ( is_user_logged_in() && 'edit' === bp_current_action() ) {
+				require $this->path . 'bp-xprofile/screens/edit.php';
+			}
+		}
+
+		// Settings.
+		if ( is_user_logged_in() && bp_is_user_settings_profile() ) {
+			require $this->path . 'bp-xprofile/screens/settings-profile.php';
+		}
 	}
 
 	/**
@@ -123,9 +162,11 @@ class BP_XProfile_Component extends BP_Component {
 		 */
 		$this->field_types = apply_filters( 'xprofile_field_types', array_keys( bp_xprofile_get_field_types() ) );
 
-		// 'option' is a special case. It is not a top-level field, so
-		// does not have an associated BP_XProfile_Field_Type class,
-		// but it must be whitelisted.
+		/*
+		 * 'option' is a special case. It is not a top-level field, so
+		 * does not have an associated BP_XProfile_Field_Type class,
+		 * but it must be explicitly allowed.
+		 */
 		$this->field_types[] = 'option';
 
 		// Register the visibility levels. See bp_xprofile_get_visibility_levels() to filter.
@@ -232,32 +273,6 @@ class BP_XProfile_Component extends BP_Component {
 			'user_has_access' => $access
 		);
 
-		// Change Avatar.
-		if ( buddypress()->avatar->show_avatars ) {
-			$sub_nav[] = array(
-				'name'            => _x( 'Change Profile Photo', 'Profile header sub menu', 'buddypress' ),
-				'slug'            => 'change-avatar',
-				'parent_url'      => $profile_link,
-				'parent_slug'     => $slug,
-				'screen_function' => 'xprofile_screen_change_avatar',
-				'position'        => 30,
-				'user_has_access' => $access
-			);
-		}
-
-		// Change Cover image.
-		if ( bp_displayed_user_use_cover_image_header() ) {
-			$sub_nav[] = array(
-				'name'            => _x( 'Change Cover Image', 'Profile header sub menu', 'buddypress' ),
-				'slug'            => 'change-cover-image',
-				'parent_url'      => $profile_link,
-				'parent_slug'     => $slug,
-				'screen_function' => 'xprofile_screen_change_cover_image',
-				'position'        => 40,
-				'user_has_access' => $access
-			);
-		}
-
 		// The Settings > Profile nav item can only be set up after
 		// the Settings component has run its own nav routine.
 		add_action( 'bp_settings_setup_nav', array( $this, 'setup_settings_nav' ) );
@@ -341,27 +356,6 @@ class BP_XProfile_Component extends BP_Component {
 				'href'     => trailingslashit( $profile_link . 'edit' ),
 				'position' => 20
 			);
-
-			// Edit Avatar.
-			if ( buddypress()->avatar->show_avatars ) {
-				$wp_admin_nav[] = array(
-					'parent'   => 'my-account-' . $this->id,
-					'id'       => 'my-account-' . $this->id . '-change-avatar',
-					'title'    => _x( 'Change Profile Photo', 'My Account Profile sub nav', 'buddypress' ),
-					'href'     => trailingslashit( $profile_link . 'change-avatar' ),
-					'position' => 30
-				);
-			}
-
-			if ( bp_displayed_user_use_cover_image_header() ) {
-				$wp_admin_nav[] = array(
-					'parent'   => 'my-account-' . $this->id,
-					'id'       => 'my-account-' . $this->id . '-change-cover-image',
-					'title'    => _x( 'Change Cover Image', 'My Account Profile sub nav', 'buddypress' ),
-					'href'     => trailingslashit( $profile_link . 'change-cover-image' ),
-					'position' => 40
-				);
-			}
 		}
 
 		parent::setup_admin_bar( $wp_admin_nav );
@@ -392,6 +386,8 @@ class BP_XProfile_Component extends BP_Component {
 				$bp->bp_options_avatar = bp_core_fetch_avatar( array(
 					'item_id' => bp_displayed_user_id(),
 					'type'    => 'thumb',
+
+					/* translators: %s: member name */
 					'alt'	  => sprintf( _x( 'Profile picture of %s', 'Avatar alt', 'buddypress' ), bp_get_displayed_user_fullname() )
 				) );
 				$bp->bp_options_title = bp_get_displayed_user_fullname();
@@ -442,5 +438,21 @@ class BP_XProfile_Component extends BP_Component {
 		);
 
 		return $wp_admin_nav;
+	}
+
+	/**
+	 * Init the BP REST API.
+	 *
+	 * @since 5.0.0
+	 *
+	 * @param array $controllers Optional. See BP_Component::rest_api_init() for
+	 *                           description.
+	 */
+	public function rest_api_init( $controllers = array() ) {
+		parent::rest_api_init( array(
+			'BP_REST_XProfile_Fields_Endpoint',
+			'BP_REST_XProfile_Field_Groups_Endpoint',
+			'BP_REST_XProfile_Data_Endpoint',
+		) );
 	}
 }

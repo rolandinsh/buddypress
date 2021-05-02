@@ -212,19 +212,19 @@ class BP_Core_Nav {
 	 *
 	 * @param string $slug        The slug of the main item.
 	 * @param string $parent_slug The slug of the sub item.
-	 * @return bool|callable|array False on failure, the screen function(s) on success.
+	 * @return false|callable|array False on failure, the screen function(s) on success.
 	 */
 	public function delete_nav( $slug = '', $parent_slug = '' ) {
 
-		// Bail if slug is empty
+		// Bail if slug is empty.
 		if ( empty( $slug ) ) {
 			return false;
 		}
 
-		// We're deleting a child
+		// We're deleting a child.
 		if ( ! empty( $parent_slug ) ) {
 
-			// Validate the subnav
+			// Validate the subnav.
 			$sub_items = $this->get_secondary( array( 'parent_slug' => $parent_slug, 'slug' => $slug ), false );
 
 			if ( ! $sub_items ) {
@@ -237,15 +237,15 @@ class BP_Core_Nav {
 				return false;
 			}
 
-			// Delete the child
+			// Delete the child.
 			unset( $this->nav[ $this->object_id ][ $parent_slug . '/' . $slug ] );
 
-			// Return the deleted item's screen function
+			// Return the deleted item's screen function.
 			return array( $sub_item->screen_function );
 
-		// We're deleting a parent
+		// We're deleting a parent.
 		} else {
-			// Validate the nav
+			// Validate the nav.
 			$nav_items = $this->get_primary( array( 'slug' => $slug ), false );
 
 			if ( ! $nav_items ) {
@@ -267,7 +267,7 @@ class BP_Core_Nav {
 				foreach ( $sub_items as $sub_item ) {
 					$screen_functions[] = $sub_item->screen_function;
 
-					// Delete the child
+					// Delete the child.
 					unset( $this->nav[ $this->object_id ][ $nav_item->slug . '/' . $sub_item->slug ] );
 				}
 			}
@@ -292,14 +292,14 @@ class BP_Core_Nav {
 		$sorted = array();
 
 		foreach ( $items as $item ) {
-			// Default position
+			// Default position.
 			$position = 99;
 
 			if ( isset( $item->position ) ) {
 				$position = (int) $item->position;
 			}
 
-			// If position is already taken, move to the first next available
+			// If position is already taken, move to the first next available.
 			if ( isset( $sorted[ $position ] ) ) {
 				$sorted_keys = array_keys( $sorted );
 
@@ -352,7 +352,7 @@ class BP_Core_Nav {
 	 *
 	 * @param array $args Filters to select the specific secondary items. See wp_list_filter().
 	 * @param bool  $sort True to sort the nav items. False otherwise.
-	 * @return array The list of secondary objects nav
+	 * @return bool|array The list of secondary objects nav, or false if none set.
 	 */
 	public function get_secondary( $args = array(), $sort = true ) {
 		$params = wp_parse_args( $args, array( 'parent_slug' => '' ) );

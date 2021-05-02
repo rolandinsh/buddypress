@@ -6,7 +6,7 @@
  * actions throughout BuddyPress.
  *
  * @package BuddyPress
- * @supackage Cache
+ * @subpackage Cache
  * @since 1.5.0
  */
 
@@ -73,19 +73,22 @@ add_action( 'deleted_user',                   'bp_core_clear_member_count_caches
  *
  * @param int $post_id ID of the page that was saved.
  */
-function bp_core_clear_directory_pages_cache_page_edit( $post_id ) {
-	if ( ! bp_is_root_blog() ) {
-		return;
-	}
+function bp_core_clear_directory_pages_cache_page_edit( $post_id = 0 ) {
 
 	// Bail if BP is not defined here.
 	if ( ! buddypress() ) {
 		return;
 	}
 
+	// Bail if not on the root blog.
+	if ( ! bp_is_root_blog() ) {
+		return;
+	}
+
 	$page_ids = bp_core_get_directory_page_ids( 'all' );
 
-	if ( ! in_array( $post_id, (array) $page_ids ) ) {
+	// Bail if post ID is not a directory page.
+	if ( ! in_array( $post_id, $page_ids ) ) {
 		return;
 	}
 
@@ -191,7 +194,7 @@ function bp_get_non_cached_ids( $item_ids, $cache_group ) {
  *     @type string       $cache_key_prefix Optional. The prefix to use when creating
  *                                          cache key names. Default: the value of $meta_table.
  * }
- * @return array|bool Metadata cache for the specified objects, or false on failure.
+ * @return false|array Metadata cache for the specified objects, or false on failure.
  */
 function bp_update_meta_cache( $args = array() ) {
 	global $wpdb;
@@ -304,6 +307,23 @@ function bp_core_set_incremented_cache( $key, $group, $ids ) {
 }
 
 /**
+ * Delete a value that has been cached using an incremented key.
+ *
+ * A utility function for use by query methods like BP_Activity_Activity::get().
+ *
+ * @since 3.0.0
+ * @see bp_core_set_incremented_cache()
+ *
+ * @param string $key   Unique key for the query. Usually a SQL string.
+ * @param string $group Cache group. Eg 'bp_activity'.
+ * @return bool True on successful removal, false on failure.
+ */
+function bp_core_delete_incremented_cache( $key, $group ) {
+	$cache_key = bp_core_get_incremented_cache_key( $key, $group );
+	return wp_cache_delete( $cache_key, $group );
+}
+
+/**
  * Gets the key to be used when caching a value using an incremented cache key.
  *
  * The $key is hashed with a component-specific incrementor, which is used to
@@ -359,3 +379,39 @@ function bp_core_get_incrementor( $group ) {
 function bp_core_reset_incrementor( $group ) {
 	return wp_cache_delete( 'incrementor', $group );
 }
+
+/**
+ * Resets all incremented bp_invitations caches.
+ *
+ * @since 5.0.0
+ */
+function bp_invitations_reset_cache_incrementor() {
+	bp_core_reset_incrementor( 'bp_invitations' );
+}
+add_action( 'bp_invitation_after_save', 'bp_invitations_reset_cache_incrementor' );
+add_action( 'bp_invitation_after_delete', 'bp_invitations_reset_cache_incrementor' );
+
+/**
+ * Add a cache group for Database object types.
+ *
+ * @since 7.0.0
+ */
+function bp_set_object_type_terms_cache_group() {
+	wp_cache_add_global_groups( 'bp_object_terms' );
+}
+add_action( 'bp_setup_cache_groups', 'bp_set_object_type_terms_cache_group' );
+
+/**
+ * Clear the Database object types cache.
+ *
+ * @since 7.0.0
+ *
+ * @param int $type_id The Type's term ID.
+ * @param string $taxonomy The Type's taxonomy name.
+ */
+function bp_clear_object_type_terms_cache( $type_id = 0, $taxonomy = '' ) {
+	wp_cache_delete( $taxonomy, 'bp_object_terms' );
+}
+add_action( 'bp_type_inserted', 'bp_clear_object_type_terms_cache' );
+add_action( 'bp_type_updated', 'bp_clear_object_type_terms_cache' );
+add_action( 'bp_type_deleted', 'bp_clear_object_type_terms_cache' );

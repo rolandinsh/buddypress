@@ -46,7 +46,7 @@ class BP_Activity_Query extends BP_Recursive_Query {
 	 * @var array
 	 */
 	public $db_columns = array(
-		'id', 'user_id', 'component', 'type', 'action', 'content',
+		'id', 'user_id', 'component', 'type', 'action', 'content', 'primary_link',
 		'item_id', 'secondary_item_id', 'hide_sitewide', 'is_spam',
 	);
 
@@ -229,7 +229,7 @@ class BP_Activity_Query extends BP_Recursive_Query {
 	/**
 	 * Validates a column name parameter.
 	 *
-	 * Column names are checked against a whitelist of known tables.
+	 * Column names are checked against a list of known tables.
 	 * See {@link BP_Activity_Query::db_tables}.
 	 *
 	 * @since 2.2.0

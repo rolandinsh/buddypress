@@ -7,7 +7,7 @@
  * @deprecated Since 1.7.0
  */
 
-// Exit if accessed directly
+// Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -74,7 +74,7 @@ function bp_get_plugin_sidebar() {
  * step. It also means that the themes won't show for selection on other blogs.
  *
  * @deprecated 1.7.0
- * @package BuddyPress Core
+ * @return array
  */
 function bp_core_allow_default_theme( $themes ) {
 	_deprecated_function( __FUNCTION__, '1.7' );
@@ -153,7 +153,7 @@ function bp_update_db_stuff() {
 		bp_core_add_illegal_names();
 	}
 
-	// Update and remove the message threads table if it exists
+	// Update and remove the message threads table if it exists.
 	if ( $wpdb->get_var( "SHOW TABLES LIKE '%{$bp_prefix}bp_messages_threads%'" ) ) {
 		if ( BP_Messages_Thread::update_tables() ) {
 			$wpdb->query( "DROP TABLE {$bp_prefix}bp_messages_threads" );

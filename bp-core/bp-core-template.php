@@ -138,11 +138,12 @@ function bp_get_directory_title( $component = '' ) {
 	$title = '';
 
 	// Use the string provided by the component.
-	if ( ! empty( buddypress()->{$component}->directory_title ) ) {
+	if ( isset( buddypress()->{$component}->directory_title ) && buddypress()->{$component}->directory_title ) {
 		$title = buddypress()->{$component}->directory_title;
 
 	// If none is found, concatenate.
 	} elseif ( isset( buddypress()->{$component}->name ) ) {
+		/* translators: %s: Name of the BuddyPress component */
 		$title = sprintf( __( '%s Directory', 'buddypress' ), buddypress()->{$component}->name );
 	}
 
@@ -152,7 +153,7 @@ function bp_get_directory_title( $component = '' ) {
 	 * @since 2.0.0
 	 *
 	 * @param string $title     Text to be used in <title> tag.
-	 * @param string $component Current componet being displayed.
+	 * @param string $component Current component being displayed.
 	 */
 	return apply_filters( 'bp_get_directory_title', $title, $component );
 }
@@ -192,15 +193,15 @@ function bp_get_options_avatar() {
 function bp_comment_author_avatar() {
 	global $comment;
 
-	if ( function_exists( 'bp_core_fetch_avatar' ) ) {
-		echo apply_filters( 'bp_comment_author_avatar', bp_core_fetch_avatar( array(
-			'item_id' => $comment->user_id,
-			'type'    => 'thumb',
-			'alt'     => sprintf( __( 'Profile photo of %s', 'buddypress' ), bp_core_get_user_displayname( $comment->user_id ) )
-		) ) );
-	} elseif ( function_exists( 'get_avatar' ) ) {
-		get_avatar();
-	}
+	echo apply_filters( 'bp_comment_author_avatar', bp_core_fetch_avatar( array(
+		'item_id' => $comment->user_id,
+		'type'    => 'thumb',
+		'alt'     => sprintf(
+			/* translators: %s: member name */
+			__( 'Profile photo of %s', 'buddypress' ),
+			bp_core_get_user_displayname( $comment->user_id )
+		),
+	) ) );
 }
 
 /**
@@ -211,15 +212,15 @@ function bp_comment_author_avatar() {
 function bp_post_author_avatar() {
 	global $post;
 
-	if ( function_exists( 'bp_core_fetch_avatar' ) ) {
-		echo apply_filters( 'bp_post_author_avatar', bp_core_fetch_avatar( array(
-			'item_id' => $post->post_author,
-			'type'    => 'thumb',
-			'alt'     => sprintf( __( 'Profile photo of %s', 'buddypress' ), bp_core_get_user_displayname( $post->post_author ) )
-		) ) );
-	} elseif ( function_exists( 'get_avatar' ) ) {
-		get_avatar();
-	}
+	echo apply_filters( 'bp_post_author_avatar', bp_core_fetch_avatar( array(
+		'item_id' => $post->post_author,
+		'type'    => 'thumb',
+		'alt'     => sprintf(
+			/* translators: %s: member name */
+			__( 'Profile photo of %s', 'buddypress' ),
+			bp_core_get_user_displayname( $post->post_author )
+		),
+	) ) );
 }
 
 /**
@@ -360,7 +361,7 @@ function bp_site_name() {
  * Format a date based on a UNIX timestamp.
  *
  * This function can be used to turn a UNIX timestamp into a properly formatted
- * (and possibly localized) string, userful for ouputting the date & time an
+ * (and possibly localized) string, useful for outputting the date & time an
  * action took place.
  *
  * Not to be confused with `bp_core_time_since()`, this function is best used
@@ -548,10 +549,6 @@ function bp_search_form_type_select() {
 
 	if ( bp_is_active( 'blogs' ) && is_multisite() ) {
 		$options['blogs']   = _x( 'Blogs', 'search form', 'buddypress' );
-	}
-
-	if ( bp_is_active( 'forums' ) && bp_forums_is_installed_correctly() && bp_forums_has_directory() ) {
-		$options['forums']  = _x( 'Forums', 'search form', 'buddypress' );
 	}
 
 	$options['posts'] = _x( 'Posts', 'search form', 'buddypress' );
@@ -796,7 +793,14 @@ function bp_form_field_attributes( $name = '', $attributes = array() ) {
 		$attributes = (array) apply_filters( 'bp_get_form_field_attributes', $attributes, $name );
 
 		foreach( $attributes as $attr => $value ) {
-			$retval .= sprintf( ' %s="%s"', sanitize_key( $attr ), esc_attr( $value ) );
+			// Numeric keyed array.
+			if (is_numeric( $attr ) ) {
+				$retval .= sprintf( ' %s', esc_attr( $value ) );
+
+			// Associative keyed array.
+			} else {
+				$retval .= sprintf( ' %s="%s"', sanitize_key( $attr ), esc_attr( $value ) );
+			}
 		}
 
 		return $retval;
@@ -984,7 +988,7 @@ function bp_create_excerpt( $text, $length = 225, $options = array() ) {
 			 *
 			 * @since 1.1.0
 			 *
-			 * @param string $truncate      Generated excerpt.
+			 * @param string $text          Generated excerpt.
 			 * @param string $original_text Original text provided.
 			 * @param int    $length        Length of returned string, including ellipsis.
 			 * @param array  $options       Array of HTML attributes and options.
@@ -1154,10 +1158,9 @@ function bp_blog_signup_allowed() {
  *              otherwise false.
  */
 function bp_account_was_activated() {
-	$bp                  = buddypress();
-	$activation_complete = !empty( $bp->activation_complete )
-		? $bp->activation_complete
-		: false;
+	$bp = buddypress();
+
+	$activation_complete = ! empty( $bp->activation_complete ) || ( bp_is_current_component( 'activate' ) && ! empty( $_GET['activated'] ) );
 
 	return $activation_complete;
 }
@@ -1225,7 +1228,7 @@ function bp_get_email_subject( $args = array() ) {
 	 *
 	 * @since 1.7.0
 	 *
-	 * @param string $subject Client friendy version of the root blog name.
+	 * @param string $subject Client friendly version of the root blog name.
 	 * @param array  $r       Array of arguments for the email subject.
 	 */
 	return apply_filters( 'bp_get_email_subject', $subject, $r );
@@ -1254,7 +1257,7 @@ function bp_ajax_querystring( $object = false ) {
 	}
 
 	/**
-	 * Filters the template paramenters to be used in the query string.
+	 * Filters the template parameters to be used in the query string.
 	 *
 	 * Allows templates to pass parameters into the template loops via AJAX.
 	 *
@@ -2079,7 +2082,7 @@ function bp_is_active( $component = '', $feature = '' ) {
 	}
 
 	// Is component in either the active or required components arrays.
-	if ( isset( buddypress()->active_components[ $component ] ) || isset( buddypress()->required_components[ $component ] ) ) {
+	if ( isset( buddypress()->active_components[ $component ] ) || in_array( $component, buddypress()->required_components, true ) ) {
 		$retval = true;
 
 		// Is feature active?
@@ -2087,9 +2090,24 @@ function bp_is_active( $component = '', $feature = '' ) {
 			// The xProfile component is specific.
 			if ( 'xprofile' === $component ) {
 				$component = 'profile';
+
+				// The Cover Image feature has been moved to the Members component in 6.0.0.
+				if ( 'cover_image' === $feature && 'profile' === $component ) {
+					_doing_it_wrong( 'bp_is_active( \'profile\', \'cover_image\' )', esc_html__( 'The cover image is a Members component feature, please use bp_is_active( \'members\', \'cover_image\' ) instead.', 'buddypress' ), '6.0.0' );
+					$members_component = buddypress()->members;
+
+					if ( ! isset( $members_component->features ) || false === in_array( $feature, $members_component->features, true ) ) {
+						$retval = false;
+					}
+
+					/** This filter is documented in wp-includes/deprecated.php */
+					return apply_filters_deprecated( 'bp_is_profile_cover_image_active', array( $retval ), '6.0.0', 'bp_is_members_cover_image_active' );
+				}
 			}
 
-			if ( empty( buddypress()->$component->features ) || false === in_array( $feature, buddypress()->$component->features, true ) ) {
+			$component_features = isset( buddypress()->{$component}->features ) ? buddypress()->{$component}->features : array();
+
+			if ( empty( $component_features ) || false === in_array( $feature, $component_features, true ) ) {
 				$retval = false;
 			}
 
@@ -2199,6 +2217,7 @@ function bp_is_groups_component() {
  * Check whether the current page is part of the Forums component.
  *
  * @since 1.5.0
+ * @since 3.0.0 Required for bbPress 2 integration.
  *
  * @return bool True if the current page is part of the Forums component.
  */
@@ -2473,54 +2492,6 @@ function bp_is_user_change_cover_image() {
 }
 
 /**
- * Is this a user's forums page?
- *
- * Eg http://example.com/members/joe/forums/ (or a subpage thereof).
- *
- * @since 1.5.0
- *
- * @return bool True if the current page is a user's forums page.
- */
-function bp_is_user_forums() {
-
-	if ( ! bp_is_active( 'forums' ) ) {
-		return false;
-	}
-
-	if ( bp_is_user() && bp_is_forums_component() ) {
-		return true;
-	}
-
-	return false;
-}
-
-/**
- * Is this a user's "Topics Started" page?
- *
- * Eg http://example.com/members/joe/forums/topics/.
- *
- * @since 1.5.0
- *
- * @return bool True if the current page is a user's Topics Started page.
- */
-function bp_is_user_forums_started() {
-	return (bool) ( bp_is_user_forums() && bp_is_current_action( 'topics' ) );
-}
-
-/**
- * Is this a user's "Replied To" page?
- *
- * Eg http://example.com/members/joe/forums/replies/.
- *
- * @since 1.5.0
- *
- * @return bool True if the current page is a user's Replied To forums page.
- */
-function bp_is_user_forums_replied_to() {
-	return (bool) ( bp_is_user_forums() && bp_is_current_action( 'replies' ) );
-}
-
-/**
  * Is the current page part of a user's Groups page?
  *
  * Eg http://example.com/members/joe/groups/ (or a subpage thereof).
@@ -2683,7 +2654,7 @@ function bp_is_user_settings_profile() {
  *
  * @since 2.0.0
  *
- * @return True if the current page is the groups directory.
+ * @return bool True if the current page is the groups directory.
  */
 function bp_is_groups_directory() {
 	if ( bp_is_groups_component() && ! bp_is_group() && ( ! bp_current_action() || ( bp_action_variable() && bp_is_current_action( bp_get_groups_group_type_base() ) ) ) ) {
@@ -2755,37 +2726,11 @@ function bp_is_group_admin_page() {
 }
 
 /**
- * Is the current page a group's forum page?
- *
- * Only applies to legacy bbPress forums.
- *
- * @since 1.1.0
- *
- * @return bool True if the current page is a group forum page.
- */
-function bp_is_group_forum() {
-	$retval = false;
-
-	// At a forum URL.
-	if ( bp_is_single_item() && bp_is_groups_component() && bp_is_current_action( 'forum' ) ) {
-		$retval = true;
-
-		// If at a forum URL, set back to false if forums are inactive, or not
-		// installed correctly.
-		if ( ! bp_is_active( 'forums' ) || ! bp_forums_is_installed_correctly() ) {
-			$retval = false;
-		}
-	}
-
-	return $retval;
-}
-
-/**
  * Is the current page a group's activity page?
  *
  * @since 1.2.1
  *
- * @return True if the current page is a group's activity page.
+ * @return bool True if the current page is a group's activity page.
  */
 function bp_is_group_activity() {
 	$retval = false;
@@ -2804,9 +2749,8 @@ function bp_is_group_activity() {
 /**
  * Is the current page a group forum topic?
  *
- * Only applies to legacy bbPress (1.x) forums.
- *
  * @since 1.1.0
+ * @since 3.0.0 Required for bbPress 2 integration.
  *
  * @return bool True if the current page is part of a group forum topic.
  */
@@ -2817,9 +2761,8 @@ function bp_is_group_forum_topic() {
 /**
  * Is the current page a group forum topic edit page?
  *
- * Only applies to legacy bbPress (1.x) forums.
- *
  * @since 1.2.0
+ * @since 3.0.0 Required for bbPress 2 integration.
  *
  * @return bool True if the current page is part of a group forum topic edit page.
  */
@@ -2930,7 +2873,7 @@ function bp_is_create_blog() {
  *
  * @since 2.0.0
  *
- * @return True if the current page is the blogs directory.
+ * @return bool True if the current page is the blogs directory.
  */
 function bp_is_blogs_directory() {
 	if ( is_multisite() && bp_is_blogs_component() && ! bp_current_action() ) {
@@ -3095,7 +3038,7 @@ function bp_get_title_parts( $seplocation = 'right' ) {
 		return $bp_title_parts;
 	}
 
-	// Now we can build the BP Title Parts
+	// Now we can build the BP Title Parts.
 	// Is there a displayed user, and do they have a name?
 	$displayed_user_name = bp_get_displayed_user_fullname();
 
@@ -3109,7 +3052,7 @@ function bp_get_title_parts( $seplocation = 'right' ) {
 		$component_subnav_name = '';
 
 		if ( ! empty( $bp->members->nav ) ) {
-			$primary_nav_item = $bp->members->nav->get_primary( array( 'slug' => $component_id ), false );
+			$primary_nav_item = (array) $bp->members->nav->get_primary( array( 'slug' => $component_id ), false );
 			$primary_nav_item = reset( $primary_nav_item );
 		}
 
@@ -3320,7 +3263,7 @@ function bp_the_body_class() {
 				$bp_classes[] = 'my-activity';
 			}
 		} else {
-			if ( bp_get_current_member_type() ) {
+			if ( bp_get_current_member_type() || ( bp_is_groups_directory() && bp_get_current_group_directory_type() ) ) {
 				$bp_classes[] = 'type';
 			}
 		}
@@ -3416,18 +3359,6 @@ function bp_the_body_class() {
 			$bp_classes[] = 'group-members';
 		}
 
-		if ( bp_is_group_forum_topic() ) {
-			$bp_classes[] = 'group-forum-topic';
-		}
-
-		if ( bp_is_group_forum_topic_edit() ) {
-			$bp_classes[] = 'group-forum-topic-edit';
-		}
-
-		if ( bp_is_group_forum() ) {
-			$bp_classes[] = 'group-forum';
-		}
-
 		if ( bp_is_group_admin_page() ) {
 			$bp_classes[] = 'group-admin';
 			$bp_classes[] = bp_get_group_current_admin_tab();
@@ -3469,6 +3400,9 @@ function bp_the_body_class() {
 		if ( ! bp_is_blog_page() ) {
 			$bp_classes[] = 'buddypress';
 		}
+
+		// Add the theme name/id to the body classes
+		$bp_classes[] = 'bp-' . bp_get_theme_compat_id();
 
 		// Merge WP classes with BuddyPress classes and remove any duplicates.
 		$classes = array_unique( array_merge( (array) $bp_classes, (array) $wp_classes ) );
@@ -3522,9 +3456,6 @@ function bp_get_the_post_class( $wp_classes = array() ) {
 
 	} elseif ( bp_is_activation_page() ) {
 		$bp_classes[] = 'bp_activate';
-
-	} elseif ( bp_is_forums_component() && bp_is_directory() ) {
-		$bp_classes[] = 'bp_forum';
 	}
 
 	if ( empty( $bp_classes ) ) {
@@ -3608,7 +3539,7 @@ function bp_get_nav_menu_items( $component = 'members' ) {
 				$submenu->parent = $nav_menu->slug;
 
 				// If we're viewing this item's screen, record that we need to mark its parent menu to be selected.
-				if ( $sub_menu->slug == bp_current_action() ) {
+				if ( bp_is_current_action( $sub_menu->slug ) && bp_is_current_component( $nav_menu->slug ) ) {
 					$menu->class[]    = 'current-menu-parent';
 					$submenu->class[] = 'current-menu-item';
 				}
@@ -3710,7 +3641,7 @@ function bp_nav_menu( $args = array() ) {
 		$args->walker = new BP_Walker_Nav_Menu;
 	}
 
-	// Sanitise values for class and ID.
+	// Sanitize values for class and ID.
 	$args->container_class = sanitize_html_class( $args->container_class );
 	$args->container_id    = sanitize_html_class( $args->container_id );
 
@@ -3835,5 +3766,14 @@ function bp_email_the_salutation( $settings = array() ) {
 		 * @param array  $settings Email Settings.
 		 * @param string $token    The Recipient token.
 		 */
-		return apply_filters( 'bp_email_get_salutation', sprintf( _x( 'Hi %s,', 'recipient salutation', 'buddypress' ), $token ), $settings, $token );
+		return apply_filters(
+			'bp_email_get_salutation',
+			sprintf(
+				/* translators: %s: the email token for the recipient name */
+				_x( 'Hi %s,', 'recipient salutation', 'buddypress' ),
+				$token
+			),
+			$settings,
+			$token
+		);
 	}

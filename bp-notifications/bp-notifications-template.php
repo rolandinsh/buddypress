@@ -632,7 +632,7 @@ function bp_the_notification_mark_read_url( $user_id = 0 ) {
  * @param int $user_id The user ID.
  */
 function bp_the_notification_mark_unread_link( $user_id = 0 ) {
-	echo bp_get_the_notification_mark_unread_link();
+	echo bp_get_the_notification_mark_unread_link( $user_id );
 }
 	/**
 	 * Return the mark unread link for the current notification.
@@ -647,7 +647,7 @@ function bp_the_notification_mark_unread_link( $user_id = 0 ) {
 		// Set default user ID to use.
 		$user_id = 0 === $user_id ? bp_displayed_user_id() : $user_id;
 
-		$retval = sprintf( '<a href="%1$s" class="mark-unread primary">%2$s</a>', esc_url( bp_get_the_notification_mark_unread_url( $user_id ) ), __( 'Unread', 'buddypress' ) );
+		$retval = sprintf( '<a href="%1$s" class="mark-unread primary bp-tooltip">%2$s</a>', esc_url( bp_get_the_notification_mark_unread_url( $user_id ) ), __( 'Unread', 'buddypress' ) );
 
 		/**
 		 * Filters the link used for marking a single notification as unread.
@@ -781,7 +781,7 @@ function bp_the_notification_delete_link( $user_id = 0 ) {
 		// Set default user ID to use.
 		$user_id = 0 === $user_id ? bp_displayed_user_id() : $user_id;
 
-		$retval = sprintf( '<a href="%1$s" class="delete secondary confirm">%2$s</a>', esc_url( bp_get_the_notification_delete_url( $user_id ) ), __( 'Delete', 'buddypress' ) );
+		$retval = sprintf( '<a href="%1$s" class="delete secondary confirm bp-tooltip">%2$s</a>', esc_url( bp_get_the_notification_delete_url( $user_id ) ), __( 'Delete', 'buddypress' ) );
 
 		/**
 		 * Filters the delete link for the current notification.
@@ -897,7 +897,7 @@ function bp_the_notification_action_links( $args = '' ) {
 		) );
 
 		// Build the links.
-		$retval = $r['before'] . implode( $r['links'], $r['sep'] ) . $r['after'];
+		$retval = $r['before'] . implode( $r['sep'], $r['links'] ) . $r['after'];
 
 		/**
 		 * Filters the action links for the current notification.
@@ -936,6 +936,7 @@ function bp_notifications_pagination_count() {
 		if ( 1 == $query_loop->total_notification_count ) {
 			$pag = __( 'Viewing 1 notification', 'buddypress' );
 		} else {
+			/* translators: 1: notification from number. 2: notification to number. 3: total notifications. */
 			$pag = sprintf( _n( 'Viewing %1$s - %2$s of %3$s notification', 'Viewing %1$s - %2$s of %3$s notifications', $query_loop->total_notification_count, 'buddypress' ), $from_num, $to_num, $total );
 		}
 

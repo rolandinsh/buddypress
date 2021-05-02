@@ -4,6 +4,7 @@
  *
  * @package BuddyPress
  * @subpackage bp-legacy
+ * @version 3.0.0
  */
 
 ?>
@@ -31,17 +32,23 @@
 
 				<?php elseif ( bp_get_max_thread_recipients_to_list() <= bp_get_thread_recipients_count() ) : ?>
 
-					<?php printf( __( 'Conversation between %s recipients.', 'buddypress' ), number_format_i18n( bp_get_thread_recipients_count() ) ); ?>
+					<?php
+					/* translators: %s: message recipients count */
+					printf( __( 'Conversation between %s recipients.', 'buddypress' ), number_format_i18n( bp_get_thread_recipients_count() ) );
+					?>
 
 				<?php else : ?>
 
-					<?php printf( __( 'Conversation between %s and you.', 'buddypress' ), bp_get_thread_recipients_list() ); ?>
+					<?php
+					/* translators: %s: message recipients list */
+					printf( __( 'Conversation between %s.', 'buddypress' ), bp_get_thread_recipients_list() );
+					?>
 
 				<?php endif; ?>
 
 			</span>
 
-			<a class="button confirm" href="<?php bp_the_thread_delete_link(); ?>" title="<?php esc_attr_e( "Delete Conversation", 'buddypress' ); ?>"><?php _e( 'Delete', 'buddypress' ); ?></a>
+			<a class="button confirm" href="<?php bp_the_thread_delete_link(); ?>"><?php _e( 'Delete', 'buddypress' ); ?></a>
 
 			<?php
 

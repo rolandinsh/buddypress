@@ -21,7 +21,8 @@ function bp_core_admin_components_settings() {
 
 	<div class="wrap">
 
-		<h1><?php _e( 'BuddyPress Settings', 'buddypress' ); ?> </h1>
+		<h1 class="wp-heading-inline"><?php _e( 'BuddyPress Settings', 'buddypress' ); ?> </h1>
+		<hr class="wp-header-end">
 
 		<h2 class="nav-tab-wrapper"><?php bp_core_admin_tabs( __( 'Components', 'buddypress' ) ); ?></h2>
 		<form action="" method="post" id="bp-admin-component-form">
@@ -80,11 +81,6 @@ function bp_core_admin_components_options() {
 	$optional_components = bp_core_admin_get_components( 'optional' );
 	$required_components = bp_core_admin_get_components( 'required' );
 	$retired_components  = bp_core_admin_get_components( 'retired'  );
-
-	// Don't show Forums component in optional components if it's disabled.
-	if ( ! bp_is_active( 'forums' ) ) {
-		unset( $optional_components['forums'] );
-	}
 
 	// Merge optional and required together.
 	$all_components = $optional_components + $required_components;
@@ -147,32 +143,79 @@ function bp_core_admin_components_options() {
 		case 'retired' :
 			$current_components = $retired_components;
 			break;
-	} ?>
+	}
+
+	$component_views = array(
+		array(
+			'action' => 'all',
+			'view'   => sprintf(
+				/* translators: %s: the number of installed components */
+				_nx( 'All <span class="count">(%s)</span>', 'All <span class="count">(%s)</span>', $all_count, 'plugins', 'buddypress' ),
+				number_format_i18n( $all_count )
+			),
+		),
+		array(
+			'action' => 'active',
+			'view'   => sprintf(
+				/* translators: %s: the number of active components */
+				_n( 'Active <span class="count">(%s)</span>', 'Active <span class="count">(%s)</span>', count( $active_components ), 'buddypress' ),
+				number_format_i18n( count( $active_components ) )
+			),
+		),
+		array(
+			'action' => 'inactive',
+			'view'   => sprintf(
+				/* translators: %s: the number of inactive components */
+				_n( 'Inactive <span class="count">(%s)</span>', 'Inactive <span class="count">(%s)</span>', count( $inactive_components ), 'buddypress' ),
+				number_format_i18n( count( $inactive_components ) )
+			),
+		),
+		array(
+			'action' => 'mustuse',
+			'view'   => sprintf(
+				/* translators: %s: the number of must-Use components */
+				_n( 'Must-Use <span class="count">(%s)</span>', 'Must-Use <span class="count">(%s)</span>', count( $required_components ), 'buddypress' ),
+				number_format_i18n( count( $required_components ) )
+			),
+		),
+		array(
+			'action' => 'retired',
+			'view'   => sprintf(
+				/* translators: %s: the number of retired components */
+				_n( 'Retired <span class="count">(%s)</span>',  'Retired <span class="count">(%s)</span>',  count( $retired_components ),  'buddypress' ),
+				number_format_i18n( count( $retired_components ) )
+			),
+		),
+	);
+	?>
 
 	<h3 class="screen-reader-text"><?php
 		/* translators: accessibility text */
-		_e( 'Filter components list', 'buddypress' );
+		esc_html_e( 'Filter components list', 'buddypress' );
 	?></h3>
 
 	<ul class="subsubsub">
-		<li><a href="<?php echo esc_url( add_query_arg( array( 'page' => 'bp-components', 'action' => 'all'      ), bp_get_admin_url( $page ) ) ); ?>" <?php if ( $action === 'all'      ) : ?>class="current"<?php endif; ?>><?php printf( _nx( 'All <span class="count">(%s)</span>',      'All <span class="count">(%s)</span>',      $all_count,         'plugins', 'buddypress' ), number_format_i18n( $all_count                    ) ); ?></a> | </li>
-		<li><a href="<?php echo esc_url( add_query_arg( array( 'page' => 'bp-components', 'action' => 'active'   ), bp_get_admin_url( $page ) ) ); ?>" <?php if ( $action === 'active'   ) : ?>class="current"<?php endif; ?>><?php printf( _n(  'Active <span class="count">(%s)</span>',   'Active <span class="count">(%s)</span>',   count( $active_components   ), 'buddypress' ), number_format_i18n( count( $active_components   ) ) ); ?></a> | </li>
-		<li><a href="<?php echo esc_url( add_query_arg( array( 'page' => 'bp-components', 'action' => 'inactive' ), bp_get_admin_url( $page ) ) ); ?>" <?php if ( $action === 'inactive' ) : ?>class="current"<?php endif; ?>><?php printf( _n(  'Inactive <span class="count">(%s)</span>', 'Inactive <span class="count">(%s)</span>', count( $inactive_components ), 'buddypress' ), number_format_i18n( count( $inactive_components ) ) ); ?></a> | </li>
-		<li><a href="<?php echo esc_url( add_query_arg( array( 'page' => 'bp-components', 'action' => 'mustuse'  ), bp_get_admin_url( $page ) ) ); ?>" <?php if ( $action === 'mustuse'  ) : ?>class="current"<?php endif; ?>><?php printf( _n(  'Must-Use <span class="count">(%s)</span>', 'Must-Use <span class="count">(%s)</span>', count( $required_components ), 'buddypress' ), number_format_i18n( count( $required_components ) ) ); ?></a> | </li>
-		<li><a href="<?php echo esc_url( add_query_arg( array( 'page' => 'bp-components', 'action' => 'retired'  ), bp_get_admin_url( $page ) ) ); ?>" <?php if ( $action === 'retired'  ) : ?>class="current"<?php endif; ?>><?php printf( _n(  'Retired <span class="count">(%s)</span>',  'Retired <span class="count">(%s)</span>',  count( $retired_components ),  'buddypress' ), number_format_i18n( count( $retired_components  ) ) ); ?></a></li>
+		<?php foreach ( $component_views as $component_view ) : ?>
+			<li>
+				<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'bp-components', 'action' => $component_view['action'] ), bp_get_admin_url( $page ) ) ); ?>" <?php if ( $action === $component_view['action'] ) : ?>class="current"<?php endif; ?>>
+					<?php echo wp_kses( $component_view['view'], array( 'span' => array( 'class' => true ) ) ); ?>
+				</a><?php echo 'retired' !== $component_view['action'] ? ' |' : ''; ?>
+			</li>
+		<?php endforeach ;?>
 	</ul>
 
 	<h3 class="screen-reader-text"><?php
 		/* translators: accessibility text */
-		_e( 'Components list', 'buddypress' );
+		esc_html_e( 'Components list', 'buddypress' );
 	?></h3>
 
 	<table class="wp-list-table widefat plugins">
 		<thead>
 			<tr>
-				<td id="cb" class="manage-column column-cb check-column"><input id="cb-select-all-1" type="checkbox" disabled><label class="screen-reader-text" for="cb-select-all-1"><?php
+				<td id="cb" class="manage-column column-cb check-column"><input id="cb-select-all-1" type="checkbox" <?php checked( empty( $inactive_components ) ); ?>>
+					<label class="screen-reader-text" for="cb-select-all-1"><?php
 					/* translators: accessibility text */
-					_e( 'Bulk selection is disabled', 'buddypress' );
+					_e( 'Enable or disable all optional components in bulk', 'buddypress' );
 				?></label></td>
 				<th scope="col" id="name" class="manage-column column-title column-primary"><?php _e( 'Component', 'buddypress' ); ?></th>
 				<th scope="col" id="description" class="manage-column column-description"><?php _e( 'Description', 'buddypress' ); ?></th>
@@ -200,18 +243,14 @@ function bp_core_admin_components_options() {
 									/* translators: accessibility text */
 									printf( __( 'Select %s', 'buddypress' ), esc_html( $labels['title'] ) ); ?></label>
 
-							<?php else : ?>
-
-								<input type="checkbox" id="<?php echo esc_attr( "bp_components[$name]" ); ?>" name="<?php echo esc_attr( "bp_components[$name]" ); ?>" value="1" checked="checked" disabled><label for="<?php echo esc_attr( "bp_components[$name]" ); ?>" class="screen-reader-text"><?php
-									/* translators: accessibility text */
-									printf( __( '%s is a required component', 'buddypress' ), esc_html( $labels['title'] ) ); ?></label>
-
 							<?php endif; ?>
 
 						</th>
 						<td class="plugin-title column-primary">
-							<span aria-hidden="true"></span>
-							<strong><?php echo esc_html( $labels['title'] ); ?></strong>
+							<label for="<?php echo esc_attr( "bp_components[$name]" ); ?>">
+								<span aria-hidden="true"></span>
+								<strong><?php echo esc_html( $labels['title'] ); ?></strong>
+							</label>
 						</td>
 
 						<td class="column-description desc">
@@ -236,9 +275,10 @@ function bp_core_admin_components_options() {
 
 		<tfoot>
 			<tr>
-				<td class="manage-column column-cb check-column"><input id="cb-select-all-2" type="checkbox" disabled><label class="screen-reader-text" for="cb-select-all-2"><?php
+				<td class="manage-column column-cb check-column"><input id="cb-select-all-2" type="checkbox" <?php checked( empty( $inactive_components ) ); ?>>
+					<label class="screen-reader-text" for="cb-select-all-2"><?php
 					/* translators: accessibility text */
-					_e( 'Bulk selection is disabled', 'buddypress' );
+					_e( 'Enable or disable all optional components in bulk', 'buddypress' );
 				?></label></td>
 				<th class="manage-column column-title column-primary"><?php _e( 'Component', 'buddypress' ); ?></th>
 				<th class="manage-column column-description"><?php _e( 'Description', 'buddypress' ); ?></th>

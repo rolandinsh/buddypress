@@ -12,10 +12,10 @@
 /**
  * Plugin Name: BuddyPress
  * Plugin URI:  https://buddypress.org/
- * Description: BuddyPress helps site builders and WordPress developers add community features to their websites, with user profile fields, activity streams, messaging, and notifications.
+ * Description: BuddyPress adds community features to WordPress. Member Profiles, Activity Streams, Direct Messaging, Notifications, and more!
  * Author:      The BuddyPress Community
  * Author URI:  https://buddypress.org/
- * Version:     2.8.2
+ * Version:     7.3.0
  * Text Domain: buddypress
  * Domain Path: /bp-languages/
  * License:     GPLv2 or later (license.txt)
@@ -26,11 +26,11 @@
  * PHP supported by WordPress.
  */
 
-// Exit if accessed directly
+// Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
 
 // Required PHP version.
-define( 'BP_REQUIRED_PHP_VERSION', '5.3.0' );
+define( 'BP_REQUIRED_PHP_VERSION', '5.6.0' );
 
 /**
  * The main function responsible for returning the one true BuddyPress Instance to functions everywhere.
@@ -40,7 +40,7 @@ define( 'BP_REQUIRED_PHP_VERSION', '5.3.0' );
  *
  * Example: <?php $bp = buddypress(); ?>
  *
- * @return BuddyPress The one true BuddyPress Instance.
+ * @return BuddyPress|null The one true BuddyPress Instance.
  */
 function buddypress() {
 	return BuddyPress::instance();
@@ -58,7 +58,7 @@ function bp_php_requirements_notice() {
 
 	?>
 
-	<div id="message" class="error notice">
+	<div id="message" class="error notice is-dismissible">
 		<p><strong><?php esc_html_e( 'Your site does not support BuddyPress.', 'buddypress' ); ?></strong></p>
 		<?php /* translators: 1: current PHP version, 2: required PHP version */ ?>
 		<p><?php printf( esc_html__( 'Your site is currently running PHP version %1$s, while BuddyPress requires version %2$s or greater.', 'buddypress' ), esc_html( phpversion() ), esc_html( BP_REQUIRED_PHP_VERSION ) ); ?> <?php printf( __( 'See <a href="%s">the Codex guide</a> for more information.', 'buddypress' ), 'https://codex.buddypress.org/getting-started/buddypress-2-8-will-require-php-5-3/' ); ?></p>
@@ -85,7 +85,7 @@ if ( version_compare( phpversion(), BP_REQUIRED_PHP_VERSION, '<' ) ) {
 	if ( defined( 'BUDDYPRESS_LATE_LOAD' ) ) {
 		add_action( 'plugins_loaded', 'buddypress', (int) BUDDYPRESS_LATE_LOAD );
 
-	// "And now here's something we hope you'll really like!"
+	// "And now here's something we hope you'll really like!".
 	} else {
 		$GLOBALS['bp'] = buddypress();
 	}

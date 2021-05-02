@@ -111,7 +111,7 @@ class BP_Core_Friends_Widget extends WP_Widget {
 				<?php while ( bp_members() ) : bp_the_member(); ?>
 					<li class="vcard">
 						<div class="item-avatar">
-							<a href="<?php bp_member_permalink(); ?>" title="<?php bp_member_name(); ?>"><?php bp_member_avatar(); ?></a>
+							<a href="<?php bp_member_permalink(); ?>" class="bp-tooltip" data-bp-tooltip="<?php bp_member_name(); ?>"><?php bp_member_avatar(); ?></a>
 						</div>
 
 						<div class="item">
@@ -161,7 +161,7 @@ class BP_Core_Friends_Widget extends WP_Widget {
 
 		$instance['max_friends']    = absint( $new_instance['max_friends'] );
 		$instance['friend_default'] = sanitize_text_field( $new_instance['friend_default'] );
-		$instance['link_title']	    = (bool) $new_instance['link_title'];
+		$instance['link_title']	    = ! empty( $new_instance['link_title'] );
 
 		return $instance;
 	}

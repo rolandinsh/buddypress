@@ -139,8 +139,10 @@ class BP_Activity_Template {
 	public function __construct( $args ) {
 		$bp = buddypress();
 
+		$function_args = func_get_args();
+
 		// Backward compatibility with old method of passing arguments.
-		if ( !is_array( $args ) || func_num_args() > 1 ) {
+		if ( !is_array( $args ) || count( $function_args ) > 1 ) {
 			_deprecated_argument( __METHOD__, '1.6', sprintf( __( 'Arguments passed to %1$s should be in an associative array. See the inline documentation at %2$s for more details.', 'buddypress' ), __METHOD__, __FILE__ ) );
 
 			$old_args_keys = array(
@@ -159,7 +161,7 @@ class BP_Activity_Template {
 				12 => 'page_arg'
 			);
 
-			$args = bp_core_parse_args_array( $old_args_keys, func_get_args() );
+			$args = bp_core_parse_args_array( $old_args_keys, $function_args );
 		}
 
 		$defaults = array(
@@ -191,11 +193,11 @@ class BP_Activity_Template {
 		$this->pag_page = bp_sanitize_pagination_arg( $this->pag_arg, $r['page']     );
 		$this->pag_num  = bp_sanitize_pagination_arg( 'num',          $r['per_page'] );
 
-		// Check if blog/forum replies are disabled.
+		// Check if post/comment replies are disabled.
 		$this->disable_blogforum_replies = (bool) bp_core_get_root_option( 'bp-disable-blogforum-comments' );
 
 		// Get an array of the logged in user's favorite activities.
-		$this->my_favs = maybe_unserialize( bp_get_user_meta( bp_loggedin_user_id(), 'bp_favorite_activities', true ) );
+		$this->my_favs = bp_get_user_meta( bp_loggedin_user_id(), 'bp_favorite_activities', true );
 
 		// Fetch specific activity items based on ID's.
 		if ( !empty( $include ) ) {

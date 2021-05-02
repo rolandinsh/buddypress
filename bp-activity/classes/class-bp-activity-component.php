@@ -51,13 +51,12 @@ class BP_Activity_Component extends BP_Component {
 		// Files to include.
 		$includes = array(
 			'cssjs',
-			'actions',
-			'screens',
 			'filters',
 			'adminbar',
 			'template',
 			'functions',
-			'cache'
+			'cache',
+			'blocks',
 		);
 
 		// Notifications support.
@@ -73,8 +72,8 @@ class BP_Activity_Component extends BP_Component {
 			$includes[] = 'akismet';
 		}
 
-		// Embeds - only applicable for WP 4.5+
-		if ( version_compare( $GLOBALS['wp_version'], '4.5', '>=' ) && bp_is_active( $this->id, 'embeds' ) ) {
+		// Embeds.
+		if ( bp_is_active( $this->id, 'embeds' ) ) {
 			$includes[] = 'embeds';
 		}
 
@@ -83,6 +82,83 @@ class BP_Activity_Component extends BP_Component {
 		}
 
 		parent::includes( $includes );
+	}
+
+	/**
+	 * Late includes method.
+	 *
+	 * Only load up certain code when on specific pages.
+	 *
+	 * @since 3.0.0
+	 */
+	public function late_includes() {
+		// Bail if PHPUnit is running.
+		if ( defined( 'BP_TESTS_DIR' ) ) {
+			return;
+		}
+
+		/*
+		 * Load activity action and screen code if PHPUnit isn't running.
+		 *
+		 * For PHPUnit, we load these files in tests/phpunit/includes/install.php.
+		 */
+		if ( bp_is_current_component( 'activity' ) ) {
+			// Authenticated actions - Only fires when JS is disabled.
+			if ( is_user_logged_in() &&
+				in_array( bp_current_action(), array( 'delete', 'spam', 'post', 'reply', 'favorite', 'unfavorite' ), true )
+			) {
+				require $this->path . 'bp-activity/actions/' . bp_current_action() . '.php';
+			}
+
+			// RSS feeds.
+			if ( bp_is_current_action( 'feed' ) || bp_is_action_variable( 'feed', 0 ) ) {
+				require $this->path . 'bp-activity/actions/feeds.php';
+			}
+
+			// Screens - Directory.
+			if ( bp_is_activity_directory() ) {
+				require $this->path . 'bp-activity/screens/directory.php';
+			}
+
+			// Screens - User main nav.
+			if ( bp_is_user() ) {
+				require $this->path . 'bp-activity/screens/just-me.php';
+			}
+
+			/**
+			 * Screens - User secondary nav.
+			 *
+			 * For these specific actions, slugs can be customized using `BP_{COMPONENT}_SLUGS`.
+			 * As a result, we need to map filenames with slugs.
+			 */
+			$filenames = array(
+				'favorites' => 'favorites',
+				'mentions'  => 'mentions',
+			);
+
+			if ( bp_is_active( 'friends' ) ) {
+				$filenames[bp_get_friends_slug()] = 'friends';
+			}
+
+			if ( bp_is_active( 'groups' ) ) {
+				$filenames[bp_get_groups_slug()] = 'groups';
+			}
+
+			// The slug is the current action requested.
+			$slug = bp_current_action();
+
+			if ( bp_is_user() && isset( $filenames[ $slug ] ) ) {
+				require $this->path . 'bp-activity/screens/' . $filenames[ $slug ] . '.php';
+			}
+
+			// Screens - Single permalink.
+			if ( bp_is_current_action( 'p' ) || is_numeric( bp_current_action() ) ) {
+				require $this->path . 'bp-activity/screens/permalink.php';
+			}
+
+			// Theme compatibility.
+			new BP_Activity_Theme_Compat();
+		}
 	}
 
 	/**
@@ -356,7 +432,11 @@ class BP_Activity_Component extends BP_Component {
 				$bp->bp_options_avatar = bp_core_fetch_avatar( array(
 					'item_id' => bp_displayed_user_id(),
 					'type'    => 'thumb',
-					'alt'	  => sprintf( __( 'Profile picture of %s', 'buddypress' ), bp_get_displayed_user_fullname() )
+					'alt'	  => sprintf(
+						/* translators: %s: member name */
+						__( 'Profile picture of %s', 'buddypress' ),
+						bp_get_displayed_user_fullname()
+					),
 				) );
 				$bp->bp_options_title  = bp_get_displayed_user_fullname();
 			}
@@ -380,5 +460,46 @@ class BP_Activity_Component extends BP_Component {
 		) );
 
 		parent::setup_cache_groups();
+	}
+
+	/**
+	 * Init the BP REST API.
+	 *
+	 * @since 5.0.0
+	 *
+	 * @param array $controllers Optional. See BP_Component::rest_api_init() for
+	 *                           description.
+	 */
+	public function rest_api_init( $controllers = array() ) {
+		parent::rest_api_init( array( 'BP_REST_Activity_Endpoint' ) );
+	}
+
+	/**
+	 * Register the BP Activity Blocks.
+	 *
+	 * @since 7.0.0
+	 *
+	 * @param array $blocks Optional. See BP_Component::blocks_init() for
+	 *                      description.
+	 */
+	public function blocks_init( $blocks = array() ) {
+		parent::blocks_init(
+			array(
+				'bp/embed-activity' => array(
+					'name'               => 'bp/embed-activity',
+					'editor_script'      => 'bp-embed-activity-block',
+					'editor_script_url'  => plugins_url( 'js/blocks/embed-activity.js', dirname(  __FILE__ ) ),
+					'editor_script_deps' => array(
+						'wp-blocks',
+						'wp-element',
+						'wp-i18n',
+						'wp-components',
+						'wp-block-editor',
+						'wp-data',
+						'wp-compose',
+					),
+				),
+			)
+		);
 	}
 }

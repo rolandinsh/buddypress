@@ -43,6 +43,8 @@ function bp_notifications_update_meta_cache( $notification_ids = false ) {
  */
 function bp_notifications_clear_all_for_user_cache( $user_id = 0 ) {
 	wp_cache_delete( 'all_for_user_' . $user_id, 'bp_notifications' );
+	wp_cache_delete( $user_id, 'bp_notifications_unread_count' );
+	wp_cache_delete( $user_id, 'bp_notifications_grouped_notifications' );
 }
 
 /**
@@ -91,7 +93,7 @@ add_action( 'bp_notification_before_delete', 'bp_notifications_clear_all_for_use
  */
 function bp_notifications_clear_all_for_user_cache_before_update( $update_args, $where_args ) {
 
-	// User ID is passed in where arugments.
+	// User ID is passed in where arguments.
 	if ( ! empty( $where_args['user_id'] ) ) {
 		bp_notifications_clear_all_for_user_cache( $where_args['user_id'] );
 

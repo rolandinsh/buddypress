@@ -23,6 +23,7 @@ class BP_XProfile_User_Admin {
 	 *
 	 * @since 2.0.0
 	 *
+	 * @return BP_XProfile_User_Admin
 	 */
 	public static function register_xprofile_user_admin() {
 
@@ -55,45 +56,12 @@ class BP_XProfile_User_Admin {
 	 * @since 2.0.0
 	 */
 	private function setup_actions() {
-		// Enqueue scripts.
-		add_action( 'bp_members_admin_enqueue_scripts',  array( $this, 'enqueue_scripts'    ), 10, 1 );
 
 		// Register the metabox in Member's community admin profile.
 		add_action( 'bp_members_admin_xprofile_metabox', array( $this, 'register_metaboxes' ), 10, 3 );
 
-		// Saves the profile actions for user ( avatar, profile fields ).
+		// Saves the profile actions for user ( profile fields ).
 		add_action( 'bp_members_admin_update_user',      array( $this, 'user_admin_load'    ), 10, 4 );
-	}
-
-	/**
-	 * Enqueue needed scripts.
-	 *
-	 * @since 2.3.0
-	 *
-	 * @param int $screen_id Screen ID being displayed.
-	 */
-	public function enqueue_scripts( $screen_id ) {
-		if ( ( false === strpos( $screen_id, 'users_page_bp-profile-edit' )
-			&& false === strpos( $screen_id, 'profile_page_bp-profile-edit' ) )
-			|| bp_core_get_root_option( 'bp-disable-avatar-uploads' )
-			|| ! buddypress()->avatar->show_avatars
-			|| ! bp_attachments_is_wp_version_supported() ) {
-			return;
-		}
-
-		/**
-		 * Get Thickbox.
-		 *
-		 * We cannot simply use add_thickbox() here as WordPress is not playing
-		 * nice with Thickbox width/height see https://core.trac.wordpress.org/ticket/17249
-		 * Using media-upload might be interesting in the future for the send to editor stuff
-		 * and we make sure the tb_window is wide enougth
-		 */
-		wp_enqueue_style ( 'thickbox' );
-		wp_enqueue_script( 'media-upload' );
-
-		// Get Avatar Uploader.
-		bp_attachments_enqueue_scripts( 'BP_Attachment_Avatar' );
 	}
 
 	/**
@@ -154,18 +122,6 @@ class BP_XProfile_User_Admin {
 				'core'
 			);
 		}
-
-		if ( buddypress()->avatar->show_avatars ) {
-			// Avatar Metabox.
-			add_meta_box(
-				'bp_xprofile_user_admin_avatar',
-				_x( 'Profile Photo', 'xprofile user-admin edit screen', 'buddypress' ),
-				array( $this, 'user_admin_avatar_metabox' ),
-				$screen_id,
-				'side',
-				'low'
-			);
-		}
 	}
 
 	/**
@@ -175,6 +131,7 @@ class BP_XProfile_User_Admin {
 	 * requests.
 	 *
 	 * @since 2.0.0
+	 * @since 6.0.0 The `delete_avatar` action is now managed into BP_Members_Admin::user_admin_load().
 	 *
 	 * @param string $doaction    Action being run.
 	 * @param int    $user_id     ID for the user whose profile is being saved.
@@ -183,23 +140,9 @@ class BP_XProfile_User_Admin {
 	 */
 	public function user_admin_load( $doaction = '', $user_id = 0, $request = array(), $redirect_to = '' ) {
 
-		// Eventually delete avatar.
-		if ( 'delete_avatar' === $doaction ) {
+		// Update profile fields.
+		if ( isset( $_POST['field_ids'] ) ) {
 
-			check_admin_referer( 'delete_avatar' );
-
-			$redirect_to = remove_query_arg( '_wpnonce', $redirect_to );
-
-			if ( bp_core_delete_existing_avatar( array( 'item_id' => $user_id ) ) ) {
-				$redirect_to = add_query_arg( 'updated', 'avatar', $redirect_to );
-			} else {
-				$redirect_to = add_query_arg( 'error', 'avatar', $redirect_to );
-			}
-
-			bp_core_redirect( $redirect_to );
-
-		} elseif ( isset( $_POST['field_ids'] ) ) {
-			// Update profile fields.
 			// Check the nonce.
 			check_admin_referer( 'edit-bp-profile_' . $user_id );
 
@@ -356,17 +299,12 @@ class BP_XProfile_User_Admin {
 			<?php while ( bp_profile_fields() ) : bp_the_profile_field(); ?>
 
 				<div<?php bp_field_css_class( 'bp-profile-field' ); ?>>
+					<fieldset>
 
 					<?php
 
 					$field_type = bp_xprofile_create_field_type( bp_get_the_profile_field_type() );
 					$field_type->edit_field_html( array( 'user_id' => $r['user_id'] ) );
-
-					if ( bp_get_the_profile_field_description() ) : ?>
-
-						<p class="description"><?php bp_the_profile_field_description(); ?></p>
-
-					<?php endif;
 
 					/**
 					 * Fires before display of visibility form elements for profile metaboxes.
@@ -377,7 +315,7 @@ class BP_XProfile_User_Admin {
 
 					$can_change_visibility = bp_current_user_can( 'bp_xprofile_change_field_visibility' ); ?>
 
-					<p class="field-visibility-settings-<?php echo $can_change_visibility ? 'toggle' : 'notoggle'; ?>" id="field-visibility-settings-toggle-<?php bp_the_profile_field_id(); ?>">
+					<p class="field-visibility-settings-<?php echo $can_change_visibility ? 'toggle' : 'notoggle'; ?>" id="field-visibility-settings-toggle-<?php bp_the_profile_field_id(); ?>"><span id="<?php bp_the_profile_field_input_name(); ?>-2">
 
 						<?php
 						printf(
@@ -385,10 +323,11 @@ class BP_XProfile_User_Admin {
 							'<span class="current-visibility-level">' . bp_get_the_profile_field_visibility_level_label() . '</span>'
 						);
 						?>
+						</span>
 
 						<?php if ( $can_change_visibility ) : ?>
 
-							<button type="button" class="button visibility-toggle-link"><?php esc_html_e( 'Change', 'buddypress' ); ?></button>
+							<button type="button" class="button visibility-toggle-link" aria-describedby="<?php bp_the_profile_field_input_name(); ?>-2" aria-expanded="false"><?php esc_html_e( 'Change', 'buddypress' ); ?></button>
 
 						<?php endif; ?>
 					</p>
@@ -416,6 +355,7 @@ class BP_XProfile_User_Admin {
 					 */
 					do_action( 'bp_custom_profile_edit_fields' ); ?>
 
+					</fieldset>
 				</div>
 
 			<?php endwhile; // End bp_profile_fields(). ?>
@@ -434,58 +374,6 @@ class BP_XProfile_User_Admin {
 	?>
 		<p><?php printf( __( '%s has been marked as a spammer. All BuddyPress data associated with the user has been removed', 'buddypress' ), esc_html( bp_core_get_user_displayname( $user->ID ) ) ) ;?></p>
 	<?php
-	}
-
-	/**
-	 * Render the Avatar metabox to moderate inappropriate images.
-	 *
-	 * @since 2.0.0
-	 *
-	 * @param WP_User|null $user The WP_User object for the user being edited.
-	 */
-	public function user_admin_avatar_metabox( $user = null ) {
-
-		if ( empty( $user->ID ) ) {
-			return;
-		} ?>
-
-		<div class="avatar">
-
-			<?php echo bp_core_fetch_avatar( array(
-				'item_id' => $user->ID,
-				'object'  => 'user',
-				'type'    => 'full',
-				'title'   => $user->display_name
-			) ); ?>
-
-			<?php if ( bp_get_user_has_avatar( $user->ID ) ) :
-
-				$query_args = array(
-					'user_id' => $user->ID,
-					'action'  => 'delete_avatar'
-				);
-
-				if ( ! empty( $_REQUEST['wp_http_referer'] ) ) {
-					$query_args['wp_http_referer'] = urlencode( wp_unslash( $_REQUEST['wp_http_referer'] ) );
-				}
-
-				$community_url = add_query_arg( $query_args, buddypress()->members->admin->edit_profile_url );
-				$delete_link   = wp_nonce_url( $community_url, 'delete_avatar' ); ?>
-
-				<a href="<?php echo esc_url( $delete_link ); ?>" class="bp-xprofile-avatar-user-admin"><?php esc_html_e( 'Delete Profile Photo', 'buddypress' ); ?></a>
-
-			<?php endif;
-
-			// Load the Avatar UI templates if user avatar uploads are enabled and current WordPress version is supported.
-			if ( ! bp_core_get_root_option( 'bp-disable-avatar-uploads' ) && bp_attachments_is_wp_version_supported() ) : ?>
-				<a href="#TB_inline?width=800px&height=400px&inlineId=bp-xprofile-avatar-editor" class="thickbox bp-xprofile-avatar-user-edit"><?php esc_html_e( 'Edit Profile Photo', 'buddypress' ); ?></a>
-				<div id="bp-xprofile-avatar-editor" style="display:none;">
-					<?php bp_attachments_get_template_part( 'avatars/index' ); ?>
-				</div>
-			<?php endif; ?>
-
-		</div>
-		<?php
 	}
 
 }

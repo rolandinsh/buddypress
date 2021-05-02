@@ -19,6 +19,7 @@ defined( 'ABSPATH' ) || exit;
  * @return bool
  */
 function bp_core_admin_is_running_php53_or_greater() {
+	_deprecated_function( __FUNCTION__, '2.8' );
 	return version_compare( PHP_VERSION, '5.3', '>=' );
 }
 
@@ -70,6 +71,8 @@ function bp_core_admin_maybe_remove_from_update_core() {
  * @return object
  */
 function bp_core_admin_remove_buddypress_from_update_transient( $retval ) {
+	_deprecated_function( __FUNCTION__, '2.8' );
+
 	$loader = basename( constant( 'BP_PLUGIN_DIR' ) ) . '/bp-loader.php';
 
 	// Remove BP from update plugins list.
@@ -96,6 +99,8 @@ function bp_core_admin_remove_buddypress_from_update_transient( $retval ) {
  *                            plugins API.
  */
 function bp_core_admin_php52_plugin_row( $file, $plugin_data ) {
+	_deprecated_function( __FUNCTION__, '2.8' );
+
 	if ( is_multisite() && ! is_network_admin() ) {
 		return;
 	}
@@ -156,6 +161,8 @@ function bp_core_admin_php52_plugin_row( $file, $plugin_data ) {
  * @deprecated 2.8.0
  */
 function bp_core_admin_php53_admin_notice() {
+	_deprecated_function( __FUNCTION__, '2.8' );
+
 	// If not on the Plugins page, stop now.
 	if ( 'plugins' !== get_current_screen()->parent_base ) {
 		return;
@@ -184,14 +191,21 @@ function bp_core_admin_php53_admin_notice() {
 		bp_get_version(),
 		true
 	);
-
-	$php_version = PHP_VERSION;
-
 	?>
 
 	<div id="message" class="error notice is-dismissible bp-is-dismissible" data-noticeid="<?php echo esc_attr( $notice_id ); ?>">
 		<p><strong><?php esc_html_e( 'Your site is not ready for BuddyPress 2.8.', 'buddypress' ); ?></strong></p>
-		<p><?php printf( esc_html__( 'Your site is currently running PHP version %s, while BuddyPress 2.8 will require version 5.3+.', 'buddypress' ), $php_version ); ?> <?php printf( __( 'See <a href="%s">the Codex guide</a> for more information.', 'buddypress' ), 'https://codex.buddypress.org/getting-started/buddypress-2-8-will-require-php-5-3/' ); ?></p>
+		<p>
+			<?php
+			/* translators: %s: the site's PHP version number */
+			printf( esc_html_x( 'Your site is currently running PHP version %s, while BuddyPress 2.8 will require version 5.3+.', 'deprecated string', 'buddypress' ), esc_html( phpversion() ) );
+			?>
+			&nbsp;
+			<?php
+			/* translators: %s: the url to a codex page */
+			printf( _x( 'See <a href="%s">the Codex guide</a> for more information.', 'deprecated string', 'buddypress' ), 'https://codex.buddypress.org/getting-started/buddypress-2-8-will-require-php-5-3/' );
+			?>
+		</p>
 		<?php wp_nonce_field( "bp-dismissible-notice-$notice_id", "bp-dismissible-nonce-$notice_id" ); ?>
 	</div>
 	<?php

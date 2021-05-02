@@ -60,7 +60,9 @@ add_action( 'bp_register_activity_actions', 'xprofile_register_activity_actions'
  */
 function bp_xprofile_format_activity_action_new_avatar( $action, $activity ) {
 	$userlink = bp_core_get_userlink( $activity->user_id );
-	$action   = sprintf( __( '%s changed their profile picture', 'buddypress' ), $userlink );
+
+	/* translators: %s: user link */
+	$action = sprintf( esc_html__( '%s changed their profile picture', 'buddypress' ), $userlink );
 
 	// Legacy filter - pass $user_id instead of $activity.
 	if ( has_filter( 'bp_xprofile_new_avatar_action' ) ) {
@@ -94,7 +96,9 @@ function bp_xprofile_format_activity_action_updated_profile( $action, $activity 
 	// your language doesn't have this restriction, feel free to use a more
 	// natural translation.
 	$profile_link = trailingslashit( bp_core_get_user_domain( $activity->user_id ) . bp_get_profile_slug() );
-	$action	      = sprintf( __( "%s's profile was updated", 'buddypress' ), '<a href="' . $profile_link . '">' . bp_core_get_user_displayname( $activity->user_id ) . '</a>' );
+
+	/* translators: %s: user profile link */
+	$action = sprintf( esc_html__( "%s's profile was updated", 'buddypress' ), '<a href="' . esc_url( $profile_link ) . '">' . bp_core_get_user_displayname( $activity->user_id ) . '</a>' );
 
 	/**
 	 * Filters the formatted 'updated_profile' activity stream action.
@@ -114,7 +118,7 @@ function bp_xprofile_format_activity_action_updated_profile( $action, $activity 
  * @since 1.0.0
  *
  * @param array|string $args String containing all variables used after bp_parse_args() call.
- * @return array
+ * @return WP_Error|bool|int
  */
 function xprofile_record_activity( $args = '' ) {
 
@@ -233,7 +237,7 @@ function bp_xprofile_new_avatar_activity( $user_id = 0 ) {
 		'type'      => 'new_avatar'
 	) );
 }
-add_action( 'xprofile_avatar_uploaded', 'bp_xprofile_new_avatar_activity' );
+add_action( 'bp_members_avatar_uploaded', 'bp_xprofile_new_avatar_activity' );
 
 /**
  * Add an activity item when a user has updated his profile.

@@ -121,20 +121,24 @@ class BP_Signup {
 	 * Fetch signups based on parameters.
 	 *
 	 * @since 2.0.0
+	 * @since 6.0.0 Added a list of allowed orderby parameters.
 	 *
 	 * @param array $args {
 	 *     The argument to retrieve desired signups.
 	 *     @type int         $offset         Offset amount. Default 0.
 	 *     @type int         $number         How many to fetch. Default 1.
 	 *     @type bool|string $usersearch     Whether or not to search for a username. Default false.
-	 *     @type string      $orderby        Order By parameter. Default 'signup_id'.
+	 *     @type string      $orderby        Order By parameter. Possible values are `signup_id`, `login`, `email`,
+	 *                                       `registered`, `activated`. Default `signup_id`.
 	 *     @type string      $order          Order direction. Default 'DESC'.
 	 *     @type bool        $include        Whether or not to include more specific query params.
 	 *     @type string      $activation_key Activation key to search for.
 	 *     @type string      $user_login     Specific user login to return.
+	 *     @type string      $fields         Which fields to return. Specify 'ids' to fetch a list of signups IDs.
+	 *                                       Default: 'all' (return BP_Signup objects).
 	 * }
 	 * @return array {
-	 *     @type array $signups Located signups.
+	 *     @type array $signups Located signups. (IDs only if `fields` is set to `ids`.)
 	 *     @type int   $total   Total number of signups matching params.
 	 * }
 	 */
@@ -151,12 +155,17 @@ class BP_Signup {
 				'include'        => false,
 				'activation_key' => '',
 				'user_login'     => '',
+				'fields'         => 'all',
 			),
 			'bp_core_signups_get_args'
 		);
 
-		// @todo whitelist sanitization
-		if ( $r['orderby'] !== 'signup_id' ) {
+		// Make sure the orderby clause is allowed.
+		if ( ! in_array( $r['orderby'], array( 'login', 'email', 'registered', 'activated' ), true ) ) {
+			$r['orderby'] = 'signup_id';
+		}
+
+		if ( 'login' === $r['orderby'] || 'email' === $r['orderby'] ) {
 			$r['orderby'] = 'user_' . $r['orderby'];
 		}
 
@@ -213,46 +222,52 @@ class BP_Signup {
 			return array( 'signups' => false, 'total' => false );
 		}
 
-		// Used to calculate a diff between now & last
-		// time an activation link has been resent.
-		$now = current_time( 'timestamp', true );
+		// We only want the IDs.
+		if ( 'ids' === $r['fields'] ) {
+			$paged_signups = wp_list_pluck( $paged_signups, 'signup_id' );
+		} else {
 
-		foreach ( (array) $paged_signups as $key => $signup ) {
+			// Used to calculate a diff between now & last
+			// time an activation link has been resent.
+			$now = current_time( 'timestamp', true );
 
-			$signup->id   = intval( $signup->signup_id );
+			foreach ( (array) $paged_signups as $key => $signup ) {
 
-			$signup->meta = ! empty( $signup->meta ) ? maybe_unserialize( $signup->meta ) : false;
+				$signup->id   = intval( $signup->signup_id );
 
-			$signup->user_name = '';
-			if ( ! empty( $signup->meta['field_1'] ) ) {
-				$signup->user_name = wp_unslash( $signup->meta['field_1'] );
+				$signup->meta = ! empty( $signup->meta ) ? maybe_unserialize( $signup->meta ) : false;
+
+				$signup->user_name = '';
+				if ( ! empty( $signup->meta['field_1'] ) ) {
+					$signup->user_name = wp_unslash( $signup->meta['field_1'] );
+				}
+
+				// Sent date defaults to date of registration.
+				if ( ! empty( $signup->meta['sent_date'] ) ) {
+					$signup->date_sent = $signup->meta['sent_date'];
+				} else {
+					$signup->date_sent = $signup->registered;
+				}
+
+				$sent_at = mysql2date('U', $signup->date_sent );
+				$diff    = $now - $sent_at;
+
+				/**
+				 * Add a boolean in case the last time an activation link
+				 * has been sent happened less than a day ago.
+				 */
+				if ( $diff < 1 * DAY_IN_SECONDS ) {
+					$signup->recently_sent = true;
+				}
+
+				if ( ! empty( $signup->meta['count_sent'] ) ) {
+					$signup->count_sent = absint( $signup->meta['count_sent'] );
+				} else {
+					$signup->count_sent = 1;
+				}
+
+				$paged_signups[ $key ] = $signup;
 			}
-
-			// Sent date defaults to date of registration.
-			if ( ! empty( $signup->meta['sent_date'] ) ) {
-				$signup->date_sent = $signup->meta['sent_date'];
-			} else {
-				$signup->date_sent = $signup->registered;
-			}
-
-			$sent_at = mysql2date('U', $signup->date_sent );
-			$diff    = $now - $sent_at;
-
-			/**
-			 * Add a boolean in case the last time an activation link
-			 * has been sent happened less than a day ago.
-			 */
-			if ( $diff < 1 * DAY_IN_SECONDS ) {
-				$signup->recently_sent = true;
-			}
-
-			if ( ! empty( $signup->meta['count_sent'] ) ) {
-				$signup->count_sent = absint( $signup->meta['count_sent'] );
-			} else {
-				$signup->count_sent = 1;
-			}
-
-			$paged_signups[ $key ] = $signup;
 		}
 
 		unset( $sql['limit'] );
@@ -271,7 +286,6 @@ class BP_Signup {
 		$total_signups = $wpdb->get_var( apply_filters( 'bp_members_signups_count_query', join( ' ', $sql ), $sql, $args, $r ) );
 
 		return array( 'signups' => $paged_signups, 'total' => $total_signups );
-
 	}
 
 	/**
@@ -388,8 +402,19 @@ class BP_Signup {
 					$current_field = $usermeta["field_{$field_id}"];
 					xprofile_set_field_data( $field_id, $user_id, $current_field );
 
-					// Save the visibility level.
-					$visibility_level = ! empty( $usermeta['field_' . $field_id . '_visibility'] ) ? $usermeta['field_' . $field_id . '_visibility'] : 'public';
+					/*
+					 * Save the visibility level.
+					 *
+					 * Use the field's default visibility if not present, and 'public' if a
+					 * default visibility is not defined.
+					 */
+					$key = "field_{$field_id}_visibility";
+					if ( isset( $usermeta[ $key ] ) ) {
+						$visibility_level = $usermeta[ $key ];
+					} else {
+						$vfield           = xprofile_get_field( $field_id, null, false );
+						$visibility_level = isset( $vfield->default_visibility ) ? $vfield->default_visibility : 'public';
+					}
 					xprofile_set_field_visibility_level( $field_id, $user_id, $visibility_level );
 				}
 			}
@@ -620,7 +645,12 @@ class BP_Signup {
 
 				// Send the validation email.
 				} else {
-					bp_core_signup_send_validation_email( false, $signup->user_email, $signup->activation_key, $signup->user_login );
+					$salutation = $signup->user_login;
+					if ( bp_is_active( 'xprofile' ) && isset( $meta[ 'field_' . bp_xprofile_fullname_field_id() ] ) ) {
+						$salutation = $meta[ 'field_' . bp_xprofile_fullname_field_id() ];
+					}
+
+					bp_core_signup_send_validation_email( false, $signup->user_email, $signup->activation_key, $salutation );
 				}
 			}
 

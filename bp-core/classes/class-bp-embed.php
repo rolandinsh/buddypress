@@ -45,11 +45,6 @@ class BP_Embed extends WP_Embed {
 			add_filter( 'bp_get_activity_content', array( &$this, 'run_shortcode' ), 7 );
 		}
 
-		if ( bp_use_embed_in_forum_posts() ) {
-			add_filter( 'bp_get_the_topic_post_content', array( &$this, 'autoembed' ), 8 );
-			add_filter( 'bp_get_the_topic_post_content', array( &$this, 'run_shortcode' ), 7 );
-		}
-
 		if ( bp_use_embed_in_private_messages() ) {
 			add_filter( 'bp_get_the_thread_message_content', array( &$this, 'autoembed' ), 8 );
 			add_filter( 'bp_get_the_thread_message_content', array( &$this, 'run_shortcode' ), 7 );
@@ -122,14 +117,9 @@ class BP_Embed extends WP_Embed {
 		 */
 		$id = apply_filters( 'embed_post_id', 0 );
 
-		$unfiltered_html   = current_user_can( 'unfiltered_html' );
-		$default_discovery = false;
-
 		// Since 4.4, WordPress is now an oEmbed provider.
-		if ( function_exists( 'wp_oembed_register_route' ) ) {
-			$unfiltered_html   = true;
-			$default_discovery = true;
-		}
+		$unfiltered_html   = true;
+		$default_discovery = true;
 
 		/**
 		 * Filters whether or not oEmbed discovery is on.
@@ -143,7 +133,13 @@ class BP_Embed extends WP_Embed {
 		$attr['discover'] = ( apply_filters( 'bp_embed_oembed_discover', $default_discovery ) && $unfiltered_html );
 
 		// Set up a new WP oEmbed object to check URL with registered oEmbed providers.
-		require_once( ABSPATH . WPINC . '/class-oembed.php' );
+		if ( file_exists( ABSPATH . WPINC . '/class-wp-oembed.php' ) ) {
+			require_once( ABSPATH . WPINC . '/class-wp-oembed.php' );
+		} else {
+			// class-oembed.php is deprecated in WordPress 5.3.0.
+			require_once( ABSPATH . WPINC . '/class-oembed.php' );
+		}
+
 		$oembed_obj = _wp_oembed_get_object();
 
 		// If oEmbed discovery is true, skip oEmbed provider check.

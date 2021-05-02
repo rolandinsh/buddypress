@@ -123,23 +123,95 @@ class BP_Groups_Component extends BP_Component {
 	public function includes( $includes = array() ) {
 		$includes = array(
 			'cache',
-			'forums',
-			'actions',
 			'filters',
-			'screens',
 			'widgets',
-			'activity',
 			'template',
 			'adminbar',
 			'functions',
-			'notifications'
+			'notifications',
+			'cssjs',
+			'blocks',
 		);
 
+		// Conditional includes.
+		if ( bp_is_active( 'activity' ) ) {
+			$includes[] = 'activity';
+		}
 		if ( is_admin() ) {
 			$includes[] = 'admin';
 		}
 
 		parent::includes( $includes );
+	}
+
+	/**
+	 * Late includes method.
+	 *
+	 * Only load up certain code when on specific pages.
+	 *
+	 * @since 3.0.0
+	 */
+	public function late_includes() {
+		// Bail if PHPUnit is running.
+		if ( defined( 'BP_TESTS_DIR' ) ) {
+			return;
+		}
+
+		if ( bp_is_groups_component() ) {
+			// Authenticated actions.
+			if ( is_user_logged_in() &&
+				in_array( bp_current_action(), array( 'create', 'join', 'leave-group' ), true )
+			) {
+				require $this->path . 'bp-groups/actions/' . bp_current_action() . '.php';
+			}
+
+			// Actions - RSS feed handler.
+			if ( bp_is_active( 'activity' ) && bp_is_current_action( 'feed' ) ) {
+				require $this->path . 'bp-groups/actions/feed.php';
+			}
+
+			// Actions - Random group handler.
+			if ( isset( $_GET['random-group'] ) ) {
+				require $this->path . 'bp-groups/actions/random.php';
+			}
+
+			// Screens - Directory.
+			if ( bp_is_groups_directory() ) {
+				require $this->path . 'bp-groups/screens/directory.php';
+			}
+
+			// Screens - User profile integration.
+			if ( bp_is_user() ) {
+				require $this->path . 'bp-groups/screens/user/my-groups.php';
+
+				if ( bp_is_current_action( 'invites' ) ) {
+					require $this->path . 'bp-groups/screens/user/invites.php';
+				}
+			}
+
+			// Single group.
+			if ( bp_is_group() ) {
+				// Actions - Access protection.
+				require $this->path . 'bp-groups/actions/access.php';
+
+				// Public nav items.
+				if ( in_array( bp_current_action(), array( 'home', 'request-membership', 'activity', 'members', 'send-invites' ), true ) ) {
+					require $this->path . 'bp-groups/screens/single/' . bp_current_action() . '.php';
+				}
+
+				// Admin nav items.
+				if ( bp_is_item_admin() && is_user_logged_in() ) {
+					require $this->path . 'bp-groups/screens/single/admin.php';
+
+					if ( in_array( bp_get_group_current_admin_tab(), array( 'edit-details', 'group-settings', 'group-avatar', 'group-cover-image', 'manage-members', 'membership-requests', 'delete-group' ), true ) ) {
+						require $this->path . 'bp-groups/screens/single/admin/' . bp_get_group_current_admin_tab() . '.php';
+					}
+				}
+			}
+
+			// Theme compatibility.
+			new BP_Groups_Theme_Compat();
+		}
 	}
 
 	/**
@@ -196,8 +268,10 @@ class BP_Groups_Component extends BP_Component {
 		/* Single Group Globals **********************************************/
 
 		// Are we viewing a single group?
-		if ( bp_is_groups_component() && $group_id = BP_Groups_Group::group_exists( bp_current_action() ) ) {
-
+		if ( bp_is_groups_component()
+			&& ( ( $group_id = BP_Groups_Group::group_exists( bp_current_action() ) )
+				|| ( $group_id = BP_Groups_Group::get_id_by_previous_slug( bp_current_action() ) ) )
+			) {
 			$bp->is_single_item  = true;
 
 			/**
@@ -240,20 +314,6 @@ class BP_Groups_Component extends BP_Component {
 			// If the user is not an admin, check if they are a moderator.
 			if ( ! bp_is_item_admin() ) {
 				bp_update_is_item_mod  ( groups_is_user_mod  ( bp_loggedin_user_id(), $this->current_group->id ), 'groups' );
-			}
-
-			// Is the logged in user a member of the group?
-			if ( ( is_user_logged_in() && groups_is_user_member( bp_loggedin_user_id(), $this->current_group->id ) ) ) {
-				$this->current_group->is_user_member = true;
-			} else {
-				$this->current_group->is_user_member = false;
-			}
-
-			// Should this group be visible to the logged in user?
-			if ( 'public' == $this->current_group->status || $this->current_group->is_user_member ) {
-				$this->current_group->is_visible = true;
-			} else {
-				$this->current_group->is_visible = false;
 			}
 
 			// Check once if the current group has a custom front template.
@@ -556,12 +616,7 @@ class BP_Groups_Component extends BP_Component {
 			// If this is a private group, and the user is not a
 			// member and does not have an outstanding invitation,
 			// show a "Request Membership" nav item.
-			if ( is_user_logged_in() &&
-				 ! $this->current_group->is_user_member &&
-				 ! groups_check_for_membership_request( bp_loggedin_user_id(), $this->current_group->id ) &&
-				 $this->current_group->status == 'private' &&
-				 ! groups_check_user_has_invite( bp_loggedin_user_id(), $this->current_group->id )
-				) {
+			if ( bp_current_user_can( 'groups_request_membership', array( 'group_id' => $this->current_group->id ) ) ) {
 
 				$sub_nav[] = array(
 					'name'            => _x( 'Request Membership','Group screen nav', 'buddypress' ),
@@ -570,20 +625,6 @@ class BP_Groups_Component extends BP_Component {
 					'parent_slug'     => $this->current_group->slug,
 					'screen_function' => 'groups_screen_group_request_membership',
 					'position'        => 30
-				);
-			}
-
-			// Forums are enabled and turned on.
-			if ( $this->current_group->enable_forum && bp_is_active( 'forums' ) ) {
-				$sub_nav[] = array(
-					'name'            => _x( 'Forum', 'My Group screen nav', 'buddypress' ),
-					'slug'            => 'forum',
-					'parent_url'      => $group_link,
-					'parent_slug'     => $this->current_group->slug,
-					'screen_function' => 'groups_screen_group_forum',
-					'position'        => 40,
-					'user_has_access' => $this->current_group->user_has_access,
-					'item_css_id'     => 'forums'
 				);
 			}
 
@@ -609,7 +650,11 @@ class BP_Groups_Component extends BP_Component {
 				 * Only add the members subnav if it's not the home's nav.
 				 */
 				$sub_nav[] = array(
-					'name'            => sprintf( _x( 'Members %s', 'My Group screen nav', 'buddypress' ), '<span>' . number_format( $this->current_group->total_member_count ) . '</span>' ),
+					'name'            => sprintf(
+						/* translators: %s: total member count */
+						_x( 'Members %s', 'My Group screen nav', 'buddypress' ),
+						'<span>' . number_format( $this->current_group->total_member_count ) . '</span>'
+					),
 					'slug'            => 'members',
 					'parent_url'      => $group_link,
 					'parent_slug'     => $this->current_group->slug,
@@ -754,7 +799,7 @@ class BP_Groups_Component extends BP_Component {
 			$title   = _x( 'Groups', 'My Account Groups', 'buddypress' );
 			$pending = _x( 'No Pending Invites', 'My Account Groups sub nav', 'buddypress' );
 
-			if ( ! empty( $count['total'] ) ) {
+			if ( $count ) {
 				$title = sprintf(
 					/* translators: %s: Group invitation count for the current user */
 					_x( 'Groups %s', 'My Account Groups nav', 'buddypress' ),
@@ -826,7 +871,11 @@ class BP_Groups_Component extends BP_Component {
 				$bp->bp_options_avatar = bp_core_fetch_avatar( array(
 					'item_id' => bp_displayed_user_id(),
 					'type'    => 'thumb',
-					'alt'     => sprintf( __( 'Profile picture of %s', 'buddypress' ), bp_get_displayed_user_fullname() )
+					'alt'     => sprintf(
+						/* translators: %s: member name */
+						__( 'Profile picture of %s', 'buddypress' ),
+						bp_get_displayed_user_fullname()
+					),
 				) );
 				$bp->bp_options_title = bp_get_displayed_user_fullname();
 
@@ -843,7 +892,7 @@ class BP_Groups_Component extends BP_Component {
 				) );
 
 				if ( empty( $bp->bp_options_avatar ) ) {
-					$bp->bp_options_avatar = '<img src="' . esc_url( bp_core_avatar_default_thumb() ) . '" alt="' . esc_attr__( 'No Group Profile Photo', 'buddypress' ) . '" class="avatar" />';
+					$bp->bp_options_avatar = '<img loading="lazy" src="' . esc_url( bp_core_avatar_default_thumb() ) . '" alt="' . esc_attr__( 'No Group Profile Photo', 'buddypress' ) . '" class="avatar" />';
 				}
 			}
 		}
@@ -875,11 +924,144 @@ class BP_Groups_Component extends BP_Component {
 	 * Set up taxonomies.
 	 *
 	 * @since 2.6.0
+	 * @since 7.0.0 The Group Type taxonomy is registered using the `bp_groups_register_group_type_taxonomy()` function.
 	 */
 	public function register_taxonomies() {
-		// Group Type.
-		register_taxonomy( 'bp_group_type', 'bp_group', array(
-			'public' => false,
-		) );
+
+		// Just let BP Component fire 'bp_groups_register_taxonomies'.
+		return parent::register_taxonomies();
+	}
+
+	/**
+	 * Init the BP REST API.
+	 *
+	 * @since 5.0.0
+	 * @since 6.0.0 Adds the Group Cover REST endpoint.
+	 *
+	 * @param array $controllers Optional. See BP_Component::rest_api_init() for
+	 *                           description.
+	 */
+	public function rest_api_init( $controllers = array() ) {
+		$controllers = array(
+			'BP_REST_Groups_Endpoint',
+			'BP_REST_Group_Membership_Endpoint',
+			'BP_REST_Group_Invites_Endpoint',
+			'BP_REST_Group_Membership_Request_Endpoint',
+			'BP_REST_Attachments_Group_Avatar_Endpoint',
+		);
+
+		// Support to Group Cover.
+		if ( bp_is_active( 'groups', 'cover_image' ) ) {
+			$controllers[] = 'BP_REST_Attachments_Group_Cover_Endpoint';
+		}
+
+		parent::rest_api_init( $controllers );
+	}
+
+	/**
+	 * Register the BP Groups Blocks.
+	 *
+	 * @since 6.0.0
+	 *
+	 * @param array $blocks Optional. See BP_Component::blocks_init() for
+	 *                      description.
+	 */
+	public function blocks_init( $blocks = array() ) {
+		parent::blocks_init(
+			array(
+				'bp/group' => array(
+					'name'               => 'bp/group',
+					'editor_script'      => 'bp-group-block',
+					'editor_script_url'  => plugins_url( 'js/blocks/group.js', dirname(  __FILE__ ) ),
+					'editor_script_deps' => array(
+						'wp-blocks',
+						'wp-element',
+						'wp-components',
+						'wp-i18n',
+						'wp-editor',
+						'wp-compose',
+						'wp-data',
+						'wp-block-editor',
+						'bp-block-components',
+					),
+					'style'              => 'bp-group-block',
+					'style_url'          => plugins_url( 'css/blocks/group.css', dirname( __FILE__ ) ),
+					'render_callback'    => 'bp_groups_render_group_block',
+					'attributes'         => array(
+						'itemID'              => array(
+							'type'    => 'integer',
+							'default' => 0,
+						),
+						'avatarSize'          => array(
+							'type'    => 'string',
+							'default' => 'full',
+						),
+						'displayDescription'  => array(
+							'type'    => 'boolean',
+							'default' => true,
+						),
+						'displayActionButton' => array(
+							'type'    => 'boolean',
+							'default' => true,
+						),
+						'displayCoverImage'   => array(
+							'type'    => 'boolean',
+							'default' => true,
+						),
+					),
+				),
+				'bp/groups' => array(
+					'name'               => 'bp/groups',
+					'editor_script'      => 'bp-groups-block',
+					'editor_script_url'  => plugins_url( 'js/blocks/groups.js', dirname( __FILE__ ) ),
+					'editor_script_deps' => array(
+						'wp-blocks',
+						'wp-element',
+						'wp-components',
+						'wp-i18n',
+						'wp-compose',
+						'wp-data',
+						'wp-api-fetch',
+						'wp-url',
+						'wp-block-editor',
+						'bp-block-components',
+						'lodash',
+					),
+					'style'              => 'bp-groups-block',
+					'style_url'          => plugins_url( 'css/blocks/groups.css', dirname( __FILE__ ) ),
+					'attributes'         => array(
+						'itemIDs'          => array(
+							'type'  => 'array',
+							'items' => array(
+								'type' => 'integer',
+							),
+						),
+						'avatarSize'       => array(
+							'type'    => 'string',
+							'default' => 'full',
+						),
+						'displayGroupName' => array(
+							'type'    => 'boolean',
+							'default' => true,
+						),
+						'extraInfo'        => array(
+							'type'    => 'string',
+							'default' => 'none',
+							'enum'    => array( 'description', 'popular', 'active', 'none' ),
+						),
+						'layoutPreference' => array(
+							'type'    => 'string',
+							'default' => 'list',
+							'enum'    => array( 'list', 'grid' ),
+						),
+						'columns'          => array(
+							'type'    => 'number',
+							'default' => 2,
+						),
+					),
+					'render_callback'    => 'bp_groups_render_groups_block',
+				),
+			)
+		);
 	}
 }

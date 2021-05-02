@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * @since 1.1.0
  *
- * @return bool|null False on failure.
+ * @return false|null False on failure.
  */
 function groups_register_activity_actions() {
 	$bp = buddypress();
@@ -54,28 +54,14 @@ function groups_register_activity_actions() {
 		array( 'activity', 'group', 'member', 'member_groups' )
 	);
 
-	// These actions are for the legacy forums
-	// Since the bbPress plugin also shares the same 'forums' identifier, we also
-	// check for the legacy forums loader class to be extra cautious.
-	if ( bp_is_active( 'forums' ) && class_exists( 'BP_Forums_Component' ) ) {
-		bp_activity_set_action(
-			$bp->groups->id,
-			'new_forum_topic',
-			__( 'New group forum topic', 'buddypress' ),
-			false,
-			__( 'Forum Topics', 'buddypress' ),
-			array( 'activity', 'group', 'member', 'member_groups' )
-		);
-
-		bp_activity_set_action(
-			$bp->groups->id,
-			'new_forum_post',
-			__( 'New group forum post',  'buddypress' ),
-			false,
-			__( 'Forum Replies', 'buddypress' ),
-			array( 'activity', 'group', 'member', 'member_groups' )
-		);
-	}
+	bp_activity_set_action(
+		$bp->groups->id,
+		'activity_update',
+		__( 'Posted a status update in a Group', 'buddypress' ),
+		'bp_groups_format_activity_action_group_activity_update',
+		__( 'Group Activity Updates', 'buddypress' ),
+		array( 'activity', 'group', 'member', 'member_groups' )
+	);
 
 	/**
 	 * Fires at end of registration of the default activity actions for the Groups component.
@@ -85,6 +71,27 @@ function groups_register_activity_actions() {
 	do_action( 'groups_register_activity_actions' );
 }
 add_action( 'bp_register_activity_actions', 'groups_register_activity_actions' );
+
+/**
+ * Get the group object the activity belongs to.
+ *
+ * @since 5.0.0
+ *
+ * @param integer $group_id The group ID the activity is linked to.
+ * @return BP_Groups_Group  The group object the activity belongs to.
+ */
+function bp_groups_get_activity_group( $group_id = 0 ) {
+	// If displaying a specific group, check the activity belongs to it.
+	if ( bp_is_group() && bp_get_current_group_id() === (int) $group_id ) {
+		$group = groups_get_current_group();
+
+		// Otherwise get the group the activity belongs to.
+	} else {
+		$group = groups_get_group( $group_id );
+	}
+
+	return $group;
+}
 
 /**
  * Format 'created_group' activity actions.
@@ -98,10 +105,11 @@ add_action( 'bp_register_activity_actions', 'groups_register_activity_actions' )
 function bp_groups_format_activity_action_created_group( $action, $activity ) {
 	$user_link = bp_core_get_userlink( $activity->user_id );
 
-	$group      = groups_get_group( $activity->item_id );
+	$group      = bp_groups_get_activity_group( $activity->item_id );
 	$group_link = '<a href="' . esc_url( bp_get_group_permalink( $group ) ) . '">' . esc_html( $group->name ) . '</a>';
 
-	$action = sprintf( __( '%1$s created the group %2$s', 'buddypress'), $user_link, $group_link );
+	/* translators: 1: the user link. 2: the group link. */
+	$action = sprintf( esc_html__( '%1$s created the group %2$s', 'buddypress'), $user_link, $group_link );
 
 	/**
 	 * Filters the 'created_group' activity actions.
@@ -126,10 +134,11 @@ function bp_groups_format_activity_action_created_group( $action, $activity ) {
 function bp_groups_format_activity_action_joined_group( $action, $activity ) {
 	$user_link = bp_core_get_userlink( $activity->user_id );
 
-	$group      = groups_get_group( $activity->item_id );
+	$group      = bp_groups_get_activity_group( $activity->item_id );
 	$group_link = '<a href="' . esc_url( bp_get_group_permalink( $group ) ) . '">' . esc_html( $group->name ) . '</a>';
 
-	$action = sprintf( __( '%1$s joined the group %2$s', 'buddypress' ), $user_link, $group_link );
+	/* translators: 1: the user link. 2: the group link. */
+	$action = sprintf( esc_html__( '%1$s joined the group %2$s', 'buddypress' ), $user_link, $group_link );
 
 	// Legacy filters (do not follow parameter patterns of other activity
 	// action filters, and requires apply_filters_ref_array()).
@@ -165,7 +174,7 @@ function bp_groups_format_activity_action_joined_group( $action, $activity ) {
 function bp_groups_format_activity_action_group_details_updated( $action, $activity ) {
 	$user_link = bp_core_get_userlink( $activity->user_id );
 
-	$group      = groups_get_group( $activity->item_id );
+	$group      = bp_groups_get_activity_group( $activity->item_id );
 	$group_link = '<a href="' . esc_url( bp_get_group_permalink( $group ) ) . '">' . esc_html( $group->name ) . '</a>';
 
 	/*
@@ -176,20 +185,27 @@ function bp_groups_format_activity_action_group_details_updated( $action, $activ
 
 	// No changed details were found, so use a generic message.
 	if ( empty( $changed ) ) {
-		$action = sprintf( __( '%1$s updated details for the group %2$s', 'buddypress' ), $user_link, $group_link );
+		/* translators: 1: the user link. 2: the group link. */
+		$action = sprintf( esc_html__( '%1$s updated details for the group %2$s', 'buddypress' ), $user_link, $group_link );
 
 	// Name and description changed - to keep things short, don't describe changes in detail.
 	} elseif ( isset( $changed['name'] ) && isset( $changed['description'] ) ) {
-		$action = sprintf( __( '%1$s changed the name and description of the group %2$s', 'buddypress' ), $user_link, $group_link );
+		/* translators: 1: the user link. 2: the group link. */
+		$action = sprintf( esc_html__( '%1$s changed the name and description of the group %2$s', 'buddypress' ), $user_link, $group_link );
 
 	// Name only.
 	} elseif ( ! empty( $changed['name']['old'] ) && ! empty( $changed['name']['new'] ) ) {
-		$action = sprintf( __( '%1$s changed the name of the group %2$s from "%3$s" to "%4$s"', 'buddypress' ), $user_link, $group_link, esc_html( $changed['name']['old'] ), esc_html( $changed['name']['new'] ) );
+		/* translators: 1: the user link. 2: the group link. 3: the old group name. 4: the new group name. */
+		$action = sprintf( esc_html__( '%1$s changed the name of the group %2$s from "%3$s" to "%4$s"', 'buddypress' ), $user_link, $group_link, esc_html( $changed['name']['old'] ), esc_html( $changed['name']['new'] ) );
 
 	// Description only.
 	} elseif ( ! empty( $changed['description']['old'] ) && ! empty( $changed['description']['new'] ) ) {
-		$action = sprintf( __( '%1$s changed the description of the group %2$s from "%3$s" to "%4$s"', 'buddypress' ), $user_link, $group_link, esc_html( $changed['description']['old'] ), esc_html( $changed['description']['new'] ) );
+		/* translators: 1: the user link. 2: the group link. 3: the old group description. 4: the new group description. */
+		$action = sprintf( esc_html__( '%1$s changed the description of the group %2$s from "%3$s" to "%4$s"', 'buddypress' ), $user_link, $group_link, esc_html( $changed['description']['old'] ), esc_html( $changed['description']['new'] ) );
 
+	} elseif ( ! empty( $changed['slug']['old'] ) && ! empty( $changed['slug']['new'] ) ) {
+		/* translators: 1: the user link. 2: the group link. */
+		$action = sprintf( esc_html__( '%1$s changed the permalink of the group %2$s.', 'buddypress' ), $user_link, $group_link );
 	}
 
 	/**
@@ -201,6 +217,43 @@ function bp_groups_format_activity_action_group_details_updated( $action, $activ
 	 * @param object $activity Activity data object.
 	 */
 	return apply_filters( 'bp_groups_format_activity_action_joined_group', $action, $activity );
+}
+
+/**
+ * Format the action for activity updates posted in a Group.
+ *
+ * @since 5.0.0
+ *
+ * @param string $action   Static activity action.
+ * @param object $activity Activity data object.
+ * @return string          The formatted action for activity updates posted in a Group.
+ */
+function bp_groups_format_activity_action_group_activity_update( $action, $activity ) {
+	$user_link = bp_core_get_userlink( $activity->user_id );
+	$group     = bp_groups_get_activity_group( $activity->item_id );
+
+	$group_link = '<a href="' . esc_url( bp_get_group_permalink( $group ) ) . '">' . esc_html( $group->name ) . '</a>';
+
+	// Set the Activity update posted in a Group action.
+	$action = sprintf(
+		/* translators: 1: the user link. 2: the group link. */
+		esc_html__( '%1$s posted an update in the group %2$s', 'buddypress' ),
+		$user_link,
+		$group_link
+	);
+
+	/** This filter is documented in wp-includes/deprecated.php */
+	$action = apply_filters_deprecated( 'groups_activity_new_update_action', array( $action ), '5.0.0', 'bp_groups_format_activity_action_group_activity_update' );
+
+	/**
+	 * Filters the Group's activity update action.
+	 *
+	 * @since 5.0.0
+	 *
+	 * @param string $action   The Group's activity update action.
+	 * @param object $activity Activity data object.
+	 */
+	return apply_filters( 'bp_groups_format_activity_action_group_activity_update', $action, $activity );
 }
 
 /**
@@ -318,6 +371,119 @@ function bp_groups_filter_activity_scope( $retval = array(), $filter = array() )
 add_filter( 'bp_activity_set_groups_scope_args', 'bp_groups_filter_activity_scope', 10, 2 );
 
 /**
+ * Enforces group membership restrictions on activity favorite queries.
+ *
+ * @since 4.3.0
+
+ * @param array $retval Query arguments.
+ * @param array $filter
+ * @return array
+ */
+function bp_groups_filter_activity_favorites_scope( $retval, $filter ) {
+	// Only process for viewers looking at their own favorites feed.
+	if ( ! empty( $filter['user_id'] ) ) {
+		$user_id = (int) $filter['user_id'];
+	} else {
+		$user_id = bp_displayed_user_id() ? bp_displayed_user_id() : bp_loggedin_user_id();
+	}
+
+	if ( ! $user_id || ! is_user_logged_in() || $user_id !== bp_loggedin_user_id() ) {
+		return $retval;
+	}
+
+	$favs = bp_activity_get_user_favorites( $user_id );
+	if ( empty( $favs ) ) {
+		return $retval;
+	}
+
+	$user_groups = bp_get_user_groups(
+		$user_id,
+		array(
+			'is_admin' => null,
+			'is_mod'   => null,
+		)
+	);
+
+	$retval = array(
+		'relation' => 'OR',
+
+		// Allow hidden items for items unconnected to groups.
+		'non_groups' => array(
+			'relation' => 'AND',
+			array(
+				'column'  => 'component',
+				'compare' => '!=',
+				'value'   => buddypress()->groups->id,
+			),
+			array(
+				'column'  => 'hide_sitewide',
+				'compare' => 'IN',
+				'value'   => array( 1, 0 ),
+			),
+			array(
+				'column'  => 'id',
+				'compare' => 'IN',
+				'value'   => $favs,
+			),
+		),
+
+		// Trust the favorites list for group items that are not hidden sitewide.
+		'non_hidden_groups' => array(
+			'relation' => 'AND',
+			array(
+				'column'  => 'component',
+				'compare' => '=',
+				'value'   => buddypress()->groups->id,
+			),
+			array(
+				'column'  => 'hide_sitewide',
+				'compare' => '=',
+				'value'   => 0,
+			),
+			array(
+				'column'  => 'id',
+				'compare' => 'IN',
+				'value'   => $favs,
+			),
+		),
+
+		// For hidden group items, limit to those in the user's groups.
+		'hidden_groups' => array(
+			'relation' => 'AND',
+			array(
+				'column'  => 'component',
+				'compare' => '=',
+				'value'   => buddypress()->groups->id,
+			),
+			array(
+				'column'  => 'hide_sitewide',
+				'compare' => '=',
+				'value'   => 1,
+			),
+			array(
+				'column'  => 'id',
+				'compare' => 'IN',
+				'value'   => $favs,
+			),
+			array(
+				'column'  => 'item_id',
+				'compare' => 'IN',
+				'value'   => wp_list_pluck( $user_groups, 'group_id' ),
+			),
+		),
+
+		'override' => array(
+			'display_comments' => true,
+			'filter'           => array( 'user_id' => 0 ),
+			'show_hidden'      => true,
+		),
+	);
+
+	return $retval;
+}
+add_filter( 'bp_activity_set_favorites_scope_args', 'bp_groups_filter_activity_favorites_scope', 20, 2 );
+
+/**
  * Record an activity item related to the Groups component.
  *
  * A wrapper for {@link bp_activity_add()} that provides some Groups-specific
@@ -337,7 +503,7 @@ add_filter( 'bp_activity_set_groups_scope_args', 'bp_groups_filter_activity_scop
  *     @type bool   $hide_sitewide Default: True if the current group is not
  *                                 public, otherwise false.
  * }
- * @return bool See {@link bp_activity_add()}.
+ * @return WP_Error|bool|int See {@link bp_activity_add()}.
  */
 function groups_record_activity( $args = '' ) {
 
@@ -347,19 +513,15 @@ function groups_record_activity( $args = '' ) {
 
 	// Set the default for hide_sitewide by checking the status of the group.
 	$hide_sitewide = false;
-	if ( !empty( $args['item_id'] ) ) {
-		if ( bp_get_current_group_id() == $args['item_id'] ) {
-			$group = groups_get_current_group();
-		} else {
-			$group = groups_get_group( $args['item_id'] );
-		}
+	if ( ! empty( $args['item_id'] ) ) {
+		$group = bp_groups_get_activity_group( $args['item_id'] );
 
 		if ( isset( $group->status ) && 'public' != $group->status ) {
 			$hide_sitewide = true;
 		}
 	}
 
-	$r = wp_parse_args( $args, array(
+	$r = bp_parse_args( $args, array(
 		'id'                => false,
 		'user_id'           => bp_loggedin_user_id(),
 		'action'            => '',
@@ -372,37 +534,193 @@ function groups_record_activity( $args = '' ) {
 		'recorded_time'     => bp_core_current_time(),
 		'hide_sitewide'     => $hide_sitewide,
 		'error_type'        => 'bool'
-	) );
+	), 'groups_record_activity' );
 
 	return bp_activity_add( $r );
 }
 
 /**
- * Update the last_activity meta value for a given group.
+ * Post an Activity status update affiliated with a group.
  *
- * @since 1.0.0
+ * @since 1.2.0
+ * @since 2.6.0 Added 'error_type' parameter to $args.
  *
- * @param int $group_id Optional. The ID of the group whose last_activity is
- *                      being updated. Default: the current group's ID.
- * @return bool|null False on failure.
+ * @param array|string $args {
+ *     Array of arguments.
+ *     @type string $content  The content of the update.
+ *     @type int    $user_id  Optional. ID of the user posting the update. Default:
+ *                            ID of the logged-in user.
+ *     @type int    $group_id Optional. ID of the group to be affiliated with the
+ *                            update. Default: ID of the current group.
+ * }
+ * @return WP_Error|bool|int Returns the ID of the new activity item on success, or false on failure.
  */
-function groups_update_last_activity( $group_id = 0 ) {
+function groups_post_update( $args = '' ) {
+	$bp = buddypress();
 
-	if ( empty( $group_id ) ) {
-		$group_id = buddypress()->groups->current_group->id;
+	$r = bp_parse_args( $args, array(
+		'content'    => false,
+		'user_id'    => bp_loggedin_user_id(),
+		'group_id'   => 0,
+		'error_type' => 'bool'
+	), 'groups_post_update' );
+
+	$group_id = (int) $r['group_id'];
+	if ( ! $group_id && ! empty( $bp->groups->current_group->id ) ) {
+		$group_id = (int) $bp->groups->current_group->id;
 	}
 
-	if ( empty( $group_id ) ) {
+	$content = $r['content'];
+	$user_id = (int) $r['user_id'];
+	if ( ! $content || ! strlen( trim( $content ) ) || ! $user_id || ! $group_id ) {
 		return false;
 	}
 
+	$bp->groups->current_group = groups_get_group( $group_id );
+
+	// Be sure the user is a member of the group before posting.
+	if ( ! bp_current_user_can( 'bp_moderate' ) && ! groups_is_user_member( $user_id, $group_id ) ) {
+		return false;
+	}
+
+	/**
+	 * Filters the content for the new group activity update.
+	 *
+	 * @since 1.2.0
+	 *
+	 * @param string $content The content of the update.
+	 */
+	$content_filtered = apply_filters( 'groups_activity_new_update_content', $content );
+
+	$activity_id = groups_record_activity( array(
+		'user_id'    => $user_id,
+		'content'    => $content_filtered,
+		'type'       => 'activity_update',
+		'item_id'    => $group_id,
+		'error_type' => $r['error_type'],
+	) );
+
 	groups_update_groupmeta( $group_id, 'last_activity', bp_core_current_time() );
+
+	/**
+	 * Fires after posting of an Activity status update affiliated with a group.
+	 *
+	 * @since 1.2.0
+	 *
+	 * @param string $content     The content of the update.
+	 * @param int    $user_id     ID of the user posting the update.
+	 * @param int    $group_id    ID of the group being posted to.
+	 * @param bool   $activity_id Whether or not the activity recording succeeded.
+	 */
+	do_action( 'bp_groups_posted_update', $content, $user_id, $group_id, $activity_id );
+
+	return $activity_id;
 }
-add_action( 'groups_join_group',           'groups_update_last_activity' );
-add_action( 'groups_leave_group',          'groups_update_last_activity' );
-add_action( 'groups_created_group',        'groups_update_last_activity' );
-add_action( 'groups_new_forum_topic',      'groups_update_last_activity' );
-add_action( 'groups_new_forum_topic_post', 'groups_update_last_activity' );
+
+/**
+ * Function used to determine if a user can delete a group activity item.
+ *
+ * Used as a filter callback to 'bp_activity_user_can_delete'.
+ *
+ * @since 6.0.0
+ *
+ * @param  bool   $retval   True if item can receive comments.
+ * @param  object $activity Activity item being checked.
+ * @return bool
+ */
+function bp_groups_filter_activity_user_can_delete( $retval, $activity ) {
+	// Bail if no current user.
+	if ( ! is_user_logged_in() ) {
+		return $retval;
+	}
+
+	if ( isset( $activity->component ) || 'groups' !== $activity->component ) {
+		return $retval;
+	}
+
+	// Trust the passed value for administrators.
+	if ( bp_current_user_can( 'bp_moderate' ) ) {
+		return $retval;
+	}
+
+	// Group administrators or moderators can delete content in that group that doesn't belong to them.
+	$group_id = $activity->item_id;
+	if ( groups_is_user_admin( bp_loggedin_user_id(), $group_id ) || groups_is_user_mod( bp_loggedin_user_id(), $group_id ) ) {
+		$retval = true;
+	}
+
+	return $retval;
+}
+add_filter( 'bp_activity_user_can_delete', 'bp_groups_filter_activity_user_can_delete', 10, 2 );
+
+/**
+ * Function used to determine if a user can comment on a group activity item.
+ *
+ * Used as a filter callback to 'bp_activity_can_comment'.
+ *
+ * @since 3.0.0
+ *
+ * @param  bool                      $retval   True if item can receive comments.
+ * @param  null|BP_Activity_Activity $activity Null by default. Pass an activity object to check against that instead.
+ * @return bool
+ */
+function bp_groups_filter_activity_can_comment( $retval, $activity = null ) {
+	// Bail if item cannot receive comments or if no current user.
+	if ( empty( $retval ) || ! is_user_logged_in() ) {
+		return $retval;
+	}
+
+	// Use passed activity object, if available.
+	if ( is_a( $activity, 'BP_Activity_Activity' ) ) {
+		$component = $activity->component;
+		$group_id  = $activity->item_id;
+
+	// Use activity info from current activity item in the loop.
+	} else {
+		$component = bp_get_activity_object_name();
+		$group_id  = bp_get_activity_item_id();
+	}
+
+	// If not a group activity item, bail.
+	if ( 'groups' !== $component ) {
+		return $retval;
+	}
+
+	// If current user is not a group member or is banned, user cannot comment.
+	if ( ! bp_current_user_can( 'bp_moderate' ) &&
+		( ! groups_is_user_member( bp_loggedin_user_id(), $group_id ) || groups_is_user_banned( bp_loggedin_user_id(), $group_id ) )
+	) {
+		$retval = false;
+	}
+
+	return $retval;
+}
+add_filter( 'bp_activity_can_comment', 'bp_groups_filter_activity_can_comment', 99, 1 );
+
+/**
+ * Function used to determine if a user can reply on a group activity comment.
+ *
+ * Used as a filter callback to 'bp_activity_can_comment_reply'.
+ *
+ * @since 3.0.0
+ *
+ * @param  bool        $retval  True if activity comment can be replied to.
+ * @param  object|bool $comment Current activity comment object. If empty, parameter is boolean false.
+ * @return bool
+ */
+function bp_groups_filter_activity_can_comment_reply( $retval, $comment ) {
+	// Bail if no current user, if comment is empty or if retval is already empty.
+	if ( ! is_user_logged_in() || empty( $comment ) || empty( $retval ) ) {
+		return $retval;
+	}
+
+	// Grab parent activity item.
+	$parent = new BP_Activity_Activity( $comment->item_id );
+
+	// Check to see if user can reply to parent group activity item.
+	return bp_groups_filter_activity_can_comment( $retval, $parent );
+}
+add_filter( 'bp_activity_can_comment_reply', 'bp_groups_filter_activity_can_comment_reply', 99, 2 );
 
 /**
  * Add an activity stream item when a member joins a group.
@@ -411,7 +729,7 @@ add_action( 'groups_new_forum_topic_post', 'groups_update_last_activity' );
  *
  * @param int $user_id  ID of the user joining the group.
  * @param int $group_id ID of the group.
- * @return bool|null False on failure.
+ * @return false|null False on failure.
  */
 function bp_groups_membership_accepted_add_activity( $user_id, $group_id ) {
 
@@ -452,7 +770,7 @@ add_action( 'groups_membership_accepted', 'bp_groups_membership_accepted_add_act
  * @param  int             $group_id       ID of the group.
  * @param  BP_Groups_Group $old_group      Group object before the details had been changed.
  * @param  bool            $notify_members True if the admin has opted to notify group members, otherwise false.
- * @return int|bool The ID of the activity on success. False on error.
+ * @return null|WP_Error|bool|int The ID of the activity on success. False on error.
  */
 function bp_groups_group_details_updated_add_activity( $group_id, $old_group, $notify_members ) {
 
@@ -461,7 +779,7 @@ function bp_groups_group_details_updated_add_activity( $group_id, $old_group, $n
 		return false;
 	}
 
-	if ( ! isset( $old_group->name ) || ! isset( $old_group->description ) ) {
+	if ( ! isset( $old_group->name ) || ! isset( $old_group->slug ) || ! isset( $old_group->description ) ) {
 		return false;
 	}
 
@@ -486,6 +804,13 @@ function bp_groups_group_details_updated_add_activity( $group_id, $old_group, $n
 		$changed['name'] = array(
 			'old' => $old_group->name,
 			'new' => $group->name,
+		);
+	}
+
+	if ( $group->slug !== $old_group->slug ) {
+		$changed['slug'] = array(
+			'old' => $old_group->slug,
+			'new' => $group->slug,
 		);
 	}
 

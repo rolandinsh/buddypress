@@ -28,12 +28,12 @@ window.bp = window.bp || {};
 		 * Default options for at.js; see https://github.com/ichord/At.js/.
 		 */
 		var suggestionsDefaults = {
-			delay:               200,
-			hide_without_suffix: true,
-			insert_tpl:          '</>${atwho-data-value}</>', // For contentEditable, the fake tags make jQuery insert a textNode.
-			limit:               10,
-			start_with_space:    false,
-			suffix:              '',
+			delay:             200,
+			hideWithoutSuffix: true,
+			insertTpl:         '@${ID}',
+			limit:             10,
+			startWithSpace:    false,
+			suffix:            '',
 
 			callbacks: {
 				/**
@@ -87,7 +87,7 @@ window.bp = window.bp || {};
 				 * @since 2.1.0
 				 */
 				before_reposition: function( offset ) {
-					// get the iframe, if any, already applied with atwho
+					// get the iframe, if any, already applied with atwho.js library.
 					var caret,
 							line,
 							iframeOffset,
@@ -109,7 +109,7 @@ window.bp = window.bp || {};
 						caret = this.$inputor.caret( 'offset' );
 					}
 
-					// If the caret is past horizontal half, then flip it, yo
+					// If the caret is past horizontal half, then flip it, yo.
 					if ( caret.left > ( $body.width() / 2 ) ) {
 						$view.addClass( 'right' );
 						move = caret.left - offset.left - this.view.$el.width();
@@ -118,15 +118,15 @@ window.bp = window.bp || {};
 						move = caret.left - offset.left + 1;
 					}
 
-					// If we're on a small screen, scroll to caret
+					// If we're on a small screen, scroll to caret.
 					if ( $body.width() <= 400 ) {
 						$( document ).scrollTop( caret.top - 6 );
 					}
 
-					// New position is under the caret (never above) and positioned to follow
-					// Dynamic sizing based on the input area (remove 'px' from end)
+					// New position is under the caret (never above) and positioned to follow.
+					// Dynamic sizing based on the input area (remove 'px' from end).
 					line = parseInt( this.$inputor.css( 'line-height' ).substr( 0, this.$inputor.css( 'line-height' ).length - 2 ), 10 );
-					if ( !line || line < 5 ) { // sanity check, and catch no line-height
+					if ( !line || line < 5 ) { // Sanity check, and catch no line-height.
 						line = 19;
 					}
 
@@ -135,11 +135,11 @@ window.bp = window.bp || {};
 				},
 
 				/**
-				 * Override default behaviour which inserts junk tags in the WordPress Visual editor.
+				 * Override default behavior which inserts junk tags in the WordPress Visual editor.
 				 *
 				 * @param {unknown} $inputor Element which we're inserting content into.
-				 * @param {string) content The content that will be inserted.
-				 * @param {string) suffix Applied to the end of the content string.
+				 * @param {string} content The content that will be inserted.
+				 * @param {string} suffix Applied to the end of the content string.
 				 * @return {string}
 				 * @since 2.1.0
 				 */
@@ -160,8 +160,9 @@ window.bp = window.bp || {};
 				 * @param {string} query Partial @mention to search for.
 				 * @param {function} render_view Render page callback function.
 				 * @since 2.1.0
+				 * @since 3.0.0. Renamed from "remote_filter" for at.js v1.5.4 support.
 				 */
-				remote_filter: function( query, render_view ) {
+				remoteFilter: function( query, render_view ) {
 					var self = $( this ),
 						params = {};
 
@@ -230,8 +231,8 @@ window.bp = window.bp || {};
 			),
 
 			at:         '@',
-			search_key: 'search',
-			tpl:        '<li data-value="@${ID}"><img src="${image}" /><span class="username">@${ID}</span><small>${name}</small></li>'
+			searchKey:  'search',
+			displayTpl: '<li data-value="@${ID}"><img src="${image}" alt="" /><span class="username">@${ID}</span><small>${name}</small></li>'
 		},
 
 		opts = $.extend( true, {}, suggestionsDefaults, mentionsDefaults, options );

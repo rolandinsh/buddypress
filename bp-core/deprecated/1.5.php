@@ -7,7 +7,7 @@
  * @deprecated Since 1.5.0
  */
 
-// Exit if accessed directly
+// Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
 
 /** Loader ********************************************************************/
@@ -74,7 +74,7 @@ if ( !function_exists( 'is_site_admin' ) ) {
 
 /**
  * In BuddyPress 1.1 - 1.2.x, this function provided a better version of add_menu_page()
- * that allowed positioning of menus. Deprecated in 1.5 in favour of a WP core function.
+ * that allowed positioning of menus. Deprecated in 1.5 in favor of a WP core function.
  *
  * @deprecated 1.5.0
  * @deprecated Use add_menu_page().
@@ -341,7 +341,7 @@ function groups_at_message_notification( $content, $poster_user_id, $group_id, $
 		if ( !groups_is_user_member( $receiver_user_id, $group_id ) )
 			continue;
 
-		// Now email the user with the contents of the message (if they have enabled email notifications)
+		// Now email the user with the contents of the message (if they have enabled email notifications).
 		if ( 'no' != bp_get_user_meta( $receiver_user_id, 'notification_activity_new_mention', true ) ) {
 			$poster_name = bp_core_get_user_displayname( $poster_user_id );
 
@@ -352,12 +352,22 @@ function groups_at_message_notification( $content, $poster_user_id, $group_id, $
 			$poster_name = stripslashes( $poster_name );
 			$content = bp_groups_filter_kses( stripslashes( $content ) );
 
-			// Set up and send the message
+			// Set up and send the message.
 			$ud = bp_core_get_core_userdata( $receiver_user_id );
 			$to = $ud->user_email;
-			$subject = bp_get_email_subject( array( 'text' => sprintf( __( '%1$s mentioned you in the group "%2$s"', 'buddypress' ), $poster_name, $group->name ) ) );
+			$subject = bp_get_email_subject(
+				array(
+					'text' => sprintf(
+						/* translators: 1: the poster name. 2: the group name. */
+						_x( '%1$s mentioned you in the group "%2$s"', 'deprecated string', 'buddypress' ),
+						$poster_name,
+						$group->name
+					)
+				)
+			);
 
-$message = sprintf( __(
+/* translators: 1: the poster name. 2: the group name. 3: the content of the activity. 4: the activity permalink. */
+$message = sprintf( _x(
 '%1$s mentioned you in the group "%2$s":
 
 "%3$s"
@@ -365,7 +375,7 @@ $message = sprintf( __(
 To view and respond to the message, log in and visit: %4$s
 
 ---------------------
-', 'buddypress' ), $poster_name, $group->name, $content, $message_link );
+', 'deprecated string', 'buddypress' ), $poster_name, $group->name, $content, $message_link );
 
 			/* Send the message */
 			$to = apply_filters( 'groups_at_message_notification_to', $to );
@@ -397,19 +407,6 @@ function bp_core_delete_notifications_for_user_by_item_id( $user_id, $item_id, $
 	_deprecated_function( __FUNCTION__, '1.5', 'bp_core_delete_notifications_by_item_id()' );
 	return BP_Core_Notification::delete_for_user_by_item_id( $user_id, $item_id, $component_name, $component_action, $secondary_item_id );
 }
-
-/**
- * In BP 1.5, these functions were renamed for greater consistency
- * @deprecated 1.5.0
- */
-function bp_forum_directory_permalink() {
-	_deprecated_function( __FUNCTION__, '1.5', 'bp_forums_directory_permalink()' );
-	bp_forums_directory_permalink();
-}
-	function bp_get_forum_directory_permalink() {
-		_deprecated_function( __FUNCTION__, '1.5', 'bp_get_forums_directory_permalink()' );
-		return bp_get_forums_directory_permalink();
-	}
 
 /**
  * Last used by core in BP 1.1. The markup was merged into DTheme's header.php template.
@@ -508,7 +505,7 @@ function bp_dtheme_deprecated() {
 	 * @deprecated No longer required.
 	 * @param string $oldvalue Previous value of get_option( 'page_on_front' )
 	 * @param string $oldvalue New value of get_option( 'page_on_front' )
-	 * @return bool|string
+	 * @return false|string
 	 * @since 1.2.0
 	 */
 	function bp_dtheme_page_on_front_update( $oldvalue, $newvalue ) {
