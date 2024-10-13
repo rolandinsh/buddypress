@@ -14,12 +14,14 @@
  */
 function groups_screen_group_admin_avatar() {
 
-	if ( 'group-avatar' != bp_get_group_current_admin_tab() )
-		return false;
+	if ( 'group-avatar' !== bp_get_group_current_admin_tab() ) {
+		return;
+	}
 
 	// If the logged-in user doesn't have permission or if avatar uploads are disabled, then stop here.
-	if ( ! bp_is_item_admin() || bp_disable_group_avatar_uploads() || ! buddypress()->avatar->show_avatars )
-		return false;
+	if ( ! bp_is_item_admin() || bp_disable_group_avatar_uploads() || ! buddypress()->avatar->show_avatars ) {
+		return;
+	}
 
 	$bp = buddypress();
 
@@ -42,7 +44,7 @@ function groups_screen_group_admin_avatar() {
 
 	$bp->avatar_admin->step = 'upload-image';
 
-	if ( !empty( $_FILES ) ) {
+	if ( ! empty( $_FILES ) ) {
 
 		// Check the nonce.
 		check_admin_referer( 'bp_avatar_upload' );
@@ -74,19 +76,23 @@ function groups_screen_group_admin_avatar() {
 			'crop_h'        => $_POST['h']
 		);
 
-		if ( !bp_core_avatar_handle_crop( $args ) ) {
+		$cropped_avatar = bp_core_avatar_handle_crop( $args, 'array' );
+
+		if ( ! $cropped_avatar ) {
 			bp_core_add_message( __( 'There was a problem cropping the group profile photo.', 'buddypress' ), 'error' );
 		} else {
 			/**
 			 * Fires after a group avatar is uploaded.
 			 *
 			 * @since 2.8.0
+			 * @since 10.0.0 Adds a new param: an array containing the full, thumb avatar and the timestamp.
 			 *
-			 * @param int    $group_id ID of the group.
-			 * @param string $type     Avatar type. 'crop' or 'full'.
-			 * @param array  $args     Array of parameters passed to the avatar handler.
+			 * @param int    $group_id       ID of the group.
+			 * @param string $type           Avatar type. 'crop' or 'camera'.
+			 * @param array  $args           Array of parameters passed to the avatar handler.
+			 * @param array  $cropped_avatar Array containing the full, thumb avatar and the timestamp.
 			 */
-			do_action( 'groups_avatar_uploaded', bp_get_current_group_id(), 'crop', $args );
+			do_action( 'groups_avatar_uploaded', bp_get_current_group_id(), 'crop', $args, $cropped_avatar );
 			bp_core_add_message( __( 'The new group profile photo was uploaded successfully.', 'buddypress' ) );
 		}
 	}
@@ -100,13 +106,18 @@ function groups_screen_group_admin_avatar() {
 	 */
 	do_action( 'groups_screen_group_admin_avatar', $bp->groups->current_group->id );
 
-	/**
-	 * Filters the template to load for a group's Change Avatar page.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param string $value Path to a group's Change Avatar template.
-	 */
-	bp_core_load_template( apply_filters( 'groups_template_group_admin_avatar', 'groups/single/home' ) );
+	$templates = array(
+		/**
+		 * Filters the template to load for a group's Change Avatar page.
+		 *
+		 * @since 1.0.0
+		 *
+		 * @param string $value Path to a group's Change Avatar template.
+		 */
+		apply_filters( 'groups_template_group_admin_avatar', 'groups/single/home' ),
+		'groups/single/index',
+	);
+
+	bp_core_load_template( $templates );
 }
 add_action( 'bp_screens', 'groups_screen_group_admin_avatar' );

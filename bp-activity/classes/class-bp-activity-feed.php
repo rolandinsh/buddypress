@@ -57,7 +57,9 @@ class BP_Activity_Feed {
 	 * @param string $key Property to check.
 	 * @return bool Whether or not data variable exists.
 	 */
-	public function __isset( $key ) { return isset( $this->data[$key] ); }
+	public function __isset( $key ) {
+		return isset( $this->data[ $key ] );
+	}
 
 	/**
 	 * Magic method for getting a certain data variable.
@@ -67,7 +69,9 @@ class BP_Activity_Feed {
 	 * @param string $key Property to get.
 	 * @return mixed Data in variable if available or null.
 	 */
-	public function __get( $key ) { return isset( $this->data[$key] ) ? $this->data[$key] : null; }
+	public function __get( $key ) {
+		return isset( $this->data[ $key ] ) ? $this->data[ $key ] : null;
+	}
 
 	/**
 	 * Magic method for setting a certain data variable.
@@ -77,12 +81,16 @@ class BP_Activity_Feed {
 	 * @param string $key   The property to set.
 	 * @param mixed  $value The value to set.
 	 */
-	public function __set( $key, $value ) { $this->data[$key] = $value; }
+	public function __set( $key, $value ) {
+		$this->data[ $key ] = $value;
+	}
 
 	/**
 	 * Constructor.
 	 *
 	 * @since 1.8.0
+	 *
+	 * @global WP_Query $wp_query WordPress query object.
 	 *
 	 * @param array $args Optional.
 	 */
@@ -104,50 +112,53 @@ class BP_Activity_Feed {
 			);
 		} else {
 			// Setup data.
-			$this->data = wp_parse_args( $args, array(
-				// Internal identifier for the RSS feed - should be alphanumeric only.
-				'id'               => '',
+			$this->data = bp_parse_args(
+				$args,
+				array(
+					// Internal identifier for the RSS feed - should be alphanumeric only.
+					'id'               => '',
 
-				// RSS title - should be plain-text.
-				'title'            => '',
+					// RSS title - should be plain-text.
+					'title'            => '',
 
-				// Relevant link for the RSS feed.
-				'link'             => '',
+					// Relevant link for the RSS feed.
+					'link'             => '',
 
-				// RSS description - should be plain-text.
-				'description'      => '',
+					// RSS description - should be plain-text.
+					'description'      => '',
 
-				// Time-to-live - number of minutes to cache the data before an aggregator
-				// requests it again.  This is only acknowledged if the RSS client supports it
-				//
-				// See: http://www.rssboard.org/rss-profile#element-channel-ttl.
-				// See: http://www.kbcafe.com/rss/rssfeedstate.html#ttl.
-				'ttl'              => '30',
+					// Time-to-live - number of minutes to cache the data before an aggregator
+					// requests it again.  This is only acknowledged if the RSS client supports it
+					//
+					// See: http://www.rssboard.org/rss-profile#element-channel-ttl.
+					// See: http://www.kbcafe.com/rss/rssfeedstate.html#ttl.
+					'ttl'              => '30',
 
-				// Syndication module - similar to ttl, but not really supported by RSS
-				// clients
-				//
-				// See: http://web.resource.org/rss/1.0/modules/syndication/#description.
-				// See: http://www.kbcafe.com/rss/rssfeedstate.html#syndicationmodule.
-				'update_period'    => 'hourly',
-				'update_frequency' => 2,
+					// Syndication module - similar to ttl, but not really supported by RSS
+					// clients
+					//
+					// See: http://web.resource.org/rss/1.0/modules/syndication/#description.
+					// See: http://www.kbcafe.com/rss/rssfeedstate.html#syndicationmodule.
+					'update_period'    => 'hourly',
+					'update_frequency' => 2,
 
-				// Number of items to display.
-				'max'              => 50,
+					// Number of items to display.
+					'max'              => 50,
 
-				// Activity arguments passed to bp_has_activities().
-				'activity_args'    => array(),
+					// Activity arguments passed to bp_has_activities().
+					'activity_args'    => array(),
 
-				// The activity feed is enabled.
-				'enabled'          => false,
-			) );
+					// The activity feed is enabled.
+					'enabled'          => false,
+				)
+			);
 
 			/**
 			 * Fires before the feed is setup so plugins can modify.
 			 *
 			 * @since 1.8.0
 			 *
-			 * @param BP_Activity_Feed $this Current instance of activity feed. Passed by reference.
+			 * @param BP_Activity_Feed $feed Current instance of activity feed. Passed by reference.
 			 */
 			do_action_ref_array( 'bp_activity_feed_prefetch', array( &$this ) );
 
@@ -156,7 +167,7 @@ class BP_Activity_Feed {
 
 			// Check if id is valid.
 			if ( empty( $this->id ) ) {
-				_doing_it_wrong( 'BP_Activity_Feed', __( "RSS feed 'id' must be defined", 'buddypress' ), 'BP 1.8' );
+				_doing_it_wrong( 'BP_Activity_Feed', esc_html__( "RSS feed 'id' must be defined", 'buddypress' ), 'BP 1.8' );
 				return false;
 			}
 
@@ -165,7 +176,7 @@ class BP_Activity_Feed {
 			 *
 			 * @since 1.8.0
 			 *
-			 * @param BP_Activity_Feed $this Current instance of activity feed. Passed by reference.
+			 * @param BP_Activity_Feed $feed Current instance of activity feed. Passed by reference.
 			 */
 			do_action_ref_array( 'bp_activity_feed_postfetch', array( &$this ) );
 
@@ -189,19 +200,20 @@ class BP_Activity_Feed {
 	 */
 	protected function setup_properties() {
 		$this->id               = sanitize_title( $this->id );
-		$this->title            = strip_tags( $this->title );
+		$this->title            = wp_strip_all_tags( $this->title );
 		$this->link             = esc_url_raw( $this->link );
-		$this->description      = strip_tags( $this->description );
+		$this->description      = wp_strip_all_tags( $this->description );
 		$this->ttl              = (int) $this->ttl;
-		$this->update_period    = strip_tags( $this->update_period );
+		$this->update_period    = wp_strip_all_tags( $this->update_period );
 		$this->update_frequency = (int) $this->update_frequency;
-
-		$this->activity_args    = wp_parse_args( $this->activity_args, array(
-			'max'              => $this->max,
-			'per_page'         => $this->max,
-			'display_comments' => 'stream'
-		) );
-
+		$this->activity_args    = bp_parse_args(
+			$this->activity_args,
+			array(
+				'max'              => $this->max,
+				'per_page'         => $this->max,
+				'display_comments' => 'stream',
+			)
+		);
 	}
 
 	/**
@@ -305,7 +317,7 @@ class BP_Activity_Feed {
 
 				if ( 'activity_comment' == bp_get_activity_action_name() ) :
 			?>
-				<strong><?php _e( 'In reply to', 'buddypress' ) ?></strong> -
+				<strong><?php esc_html_e( 'In reply to', 'buddypress' ) ?></strong> -
 				<?php bp_activity_parent_content() ?>
 			<?php
 				endif;
@@ -320,6 +332,8 @@ class BP_Activity_Feed {
 	 * Most of this class method is derived from {@link WP::send_headers()}.
 	 *
 	 * @since 1.9.0
+	 *
+	 * @global WP_Query $wp_query WordPress query object.
 	 */
 	protected function http_headers() {
 		// Set up some additional headers if not on a directory page
@@ -399,7 +413,14 @@ class BP_Activity_Feed {
 	 */
 	protected function output() {
 		$this->http_headers();
-		echo '<?xml version="1.0" encoding="' . get_option( 'blog_charset' ) . '"?'.'>';
+		echo '<?xml version="1.0" encoding="' . esc_attr( get_option( 'blog_charset' ) ) . '"?'.'>';
+
+		/**
+		 * Fires between the xml and rss tags in an Activity feed.
+		 *
+		 * @since 12.0.0
+		 */
+		do_action( 'bp_activity_feed_rss_tag_pre' );
 	?>
 
 <rss version="2.0"
@@ -418,16 +439,16 @@ class BP_Activity_Feed {
 >
 
 <channel>
-	<title><?php echo $this->title; ?></title>
-	<link><?php echo $this->link; ?></link>
-	<atom:link href="<?php self_link(); ?>" rel="self" type="application/rss+xml" />
-	<description><?php echo $this->description ?></description>
-	<lastBuildDate><?php echo mysql2date( 'D, d M Y H:i:s O', bp_activity_get_last_updated(), false ); ?></lastBuildDate>
-	<generator>https://buddypress.org/?v=<?php bp_version(); ?></generator>
+	<title><?php echo esc_html( $this->title ); ?></title>
+	<link><?php echo esc_url( $this->link ); ?></link>
+	<atom:link href="<?php esc_url( self_link() ); ?>" rel="self" type="application/rss+xml" />
+	<description><?php echo esc_html( $this->description ); ?></description>
+	<lastBuildDate><?php echo esc_html( mysql2date( 'D, d M Y H:i:s O', bp_activity_get_last_updated(), false ) ); ?></lastBuildDate>
+	<generator>https://buddypress.org/?v=<?php esc_html( bp_get_version() ); ?></generator>
 	<language><?php bloginfo_rss( 'language' ); ?></language>
-	<ttl><?php echo $this->ttl; ?></ttl>
-	<sy:updatePeriod><?php echo $this->update_period; ?></sy:updatePeriod>
-	<sy:updateFrequency><?php echo $this->update_frequency; ?></sy:updateFrequency>
+	<ttl><?php echo esc_html( $this->ttl ); ?></ttl>
+	<sy:updatePeriod><?php echo esc_html( $this->update_period ); ?></sy:updatePeriod>
+	<sy:updateFrequency><?php echo esc_html( $this->update_frequency ); ?></sy:updateFrequency>
 	<?php
 
 	/**
@@ -441,9 +462,9 @@ class BP_Activity_Feed {
 		<?php while ( bp_activities() ) : bp_the_activity(); ?>
 			<item>
 				<guid isPermaLink="false"><?php bp_activity_feed_item_guid(); ?></guid>
-				<title><?php echo stripslashes( bp_get_activity_feed_item_title() ); ?></title>
+				<title><?php echo esc_html( stripslashes( bp_get_activity_feed_item_title() ) ); ?></title>
 				<link><?php bp_activity_thread_permalink() ?></link>
-				<pubDate><?php echo mysql2date( 'D, d M Y H:i:s O', bp_get_activity_feed_item_date(), false ); ?></pubDate>
+				<pubDate><?php echo esc_html( mysql2date( 'D, d M Y H:i:s O', bp_get_activity_feed_item_date(), false ) ); ?></pubDate>
 
 				<?php if ( bp_get_activity_feed_item_description() ) : ?>
 					<content:encoded><![CDATA[<?php $this->feed_content(); ?>]]></content:encoded>

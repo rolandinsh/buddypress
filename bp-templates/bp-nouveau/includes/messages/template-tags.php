@@ -39,6 +39,29 @@ function bp_nouveau_messages_hook( $when = '', $suffix = '' ) {
 }
 
 /**
+ * Prints the JS Templates of the private messages UI.
+ *
+ * @since 10.0.0
+ */
+function bp_nouveau_messages_print_templates() {
+	bp_get_template_part( 'common/js-templates/messages/index' );
+}
+
+/**
+ * Prints the HTML placeholders of the private messages UI.
+ *
+ * @since 10.0.0
+ */
+function bp_nouveau_messages_print_placeholders() {
+	?>
+	<div class="subnav-filters filters user-subnav bp-messages-filters" id="subsubnav"></div>
+
+	<div class="bp-messages-feedback"></div>
+	<div class="bp-messages-content"></div>
+	<?php
+}
+
+/**
  * Load the new Messages User Interface
  *
  * @since 3.0.0
@@ -51,8 +74,24 @@ function bp_nouveau_messages_member_interface() {
 	 */
 	do_action( 'bp_before_member_messages_content' );
 
+	/**
+	 * Load the JS templates to manage Priveate Messages into site's footer.
+	 *
+	 * @since 10.0.0 Hook to the `wp_footer` action to print the JS templates.
+	 */
+	add_action( 'wp_footer', 'bp_nouveau_messages_print_templates' );
+	bp_nouveau_messages_print_placeholders();
+
+	/**
+	 * Private hook to preserve backward compatibility with plugins needing the above placeholders to be located
+	 * into: `bp-templates/bp-nouveau/buddypress/common/js-templates/messahges/index.php`.
+	 *
+	 * @since 10.0.0
+	 */
+	do_action( '_bp_nouveau_messages_print_placeholders' );
+
 	// Load the Private messages UI
-	bp_get_template_part( 'common/js-templates/messages/index' );
+
 
 	/**
 	 * Fires after the member messages content.
@@ -69,8 +108,6 @@ function bp_nouveau_messages_member_interface() {
  * @since  3.2.0 Move the function into Template Tags and use a template part.
  */
 function bp_nouveau_message_search_form() {
-	$search_form_html = bp_buffer_template_part( 'common/js-templates/messages/search-form', null, false );
-
 	/**
 	 * Filters the private message component search form.
 	 *
@@ -78,5 +115,42 @@ function bp_nouveau_message_search_form() {
 	 *
 	 * @param string $search_form_html HTML markup for the message search form.
 	 */
-	echo apply_filters( 'bp_message_search_form', $search_form_html );
+	$search_form_html = apply_filters(
+		'bp_message_search_form',
+		bp_buffer_template_part( 'common/js-templates/messages/search-form', null, false )
+	);
+
+	echo wp_kses(
+		$search_form_html,
+		array(
+			'form'   => array(
+				'action'         => true,
+				'method'         => true,
+				'id'             => true,
+				'class'          => true,
+				'data-bp-search' => true,
+			),
+			'label'  => array(
+				'for'   => true,
+				'class' => true,
+			),
+			'input'  => array(
+				'type'        => true,
+				'id'          => true,
+				'name'        => true,
+				'placeholder' => true,
+				'class'       => true,
+			),
+			'button' => array(
+				'type'  => true,
+				'name'  => true,
+				'id'    => true,
+				'class' => true,
+			),
+			'span'   => array(
+				'class'       => true,
+				'aria-hidden' => true,
+			),
+		)
+	);
 }

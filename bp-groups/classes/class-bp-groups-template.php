@@ -21,96 +21,104 @@ class BP_Groups_Template {
 	/**
 	 * The loop iterator.
 	 *
-	 * @var int
 	 * @since 1.2.0
+	 * @var int
 	 */
 	public $current_group = -1;
 
 	/**
 	 * The number of groups returned by the paged query.
 	 *
-	 * @var int
 	 * @since 1.2.0
+	 * @var int
 	 */
 	public $group_count;
 
 	/**
 	 * Array of groups located by the query.
 	 *
-	 * @var array
 	 * @since 1.2.0
+	 * @var array
 	 */
 	public $groups;
 
 	/**
 	 * The group object currently being iterated on.
 	 *
-	 * @var object
 	 * @since 1.2.0
+	 * @var object
 	 */
 	public $group;
 
 	/**
 	 * A flag for whether the loop is currently being iterated.
 	 *
-	 * @var bool
 	 * @since 1.2.0
+	 * @var bool
 	 */
 	public $in_the_loop;
 
 	/**
 	 * The page number being requested.
 	 *
-	 * @var string
 	 * @since 1.2.0
+	 * @var string
 	 */
 	public $pag_page;
 
 	/**
 	 * The number of items being requested per page.
 	 *
-	 * @var string
 	 * @since 1.2.0
+	 * @var string
 	 */
 	public $pag_num;
 
 	/**
+	 * URL argument used for the pagination param.
+	 *
+	 * @since 1.2.0
+	 * @var string
+	 */
+	public $pag_arg;
+
+	/**
 	 * An HTML string containing pagination links.
 	 *
-	 * @var string
 	 * @since 1.2.0
+	 * @var string
 	 */
 	public $pag_links;
 
 	/**
 	 * The total number of groups matching the query parameters.
 	 *
-	 * @var int
 	 * @since 1.2.0
+	 * @var int
 	 */
 	public $total_group_count;
 
 	/**
 	 * Whether the template loop is for a single group page.
 	 *
-	 * @var bool
 	 * @since 1.2.0
+	 * @var bool
 	 */
 	public $single_group = false;
 
 	/**
 	 * Field to sort by.
 	 *
-	 * @var string
 	 * @since 1.2.0
+	 * @var string
 	 */
 	public $sort_by;
 
 	/**
 	 * Sort order.
 	 *
-	 * @var string
 	 * @since 1.2.0
+	 * @var string
 	 */
 	public $order;
 
@@ -127,12 +135,10 @@ class BP_Groups_Template {
 	 *     @type int $page Default: 1.
 	 * }
 	 */
-	function __construct( $args = array() ){
-		$function_args = func_get_args();
-
+	function __construct( ...$args ){
 		// Backward compatibility with old method of passing arguments.
-		if ( ! is_array( $args ) || count( $function_args ) > 1 ) {
-			_deprecated_argument( __METHOD__, '1.7', sprintf( __( 'Arguments passed to %1$s should be in an associative array. See the inline documentation at %2$s for more details.', 'buddypress' ), __METHOD__, __FILE__ ) );
+		if ( ! is_array( $args[0] ) || count( $args ) > 1 ) {
+			_deprecated_argument( __METHOD__, '1.7', sprintf( esc_html__( 'Arguments passed to %1$s should be in an associative array. See the inline documentation at %2$s for more details.', 'buddypress' ), __METHOD__, __FILE__ ) );
 
 			$old_args_keys = array(
 				0  => 'user_id',
@@ -149,7 +155,9 @@ class BP_Groups_Template {
 				11 => 'page_arg',
 			);
 
-			$args = bp_core_parse_args_array( $old_args_keys, $function_args );
+			$args = bp_core_parse_args_array( $old_args_keys, $args );
+		} else {
+			$args = reset( $args );
 		}
 
 		$defaults = array(
@@ -173,11 +181,17 @@ class BP_Groups_Template {
 			'group_type__not_in' => '',
 			'status'             => array(),
 			'meta_query'         => false,
+			'date_query'         => false,
 			'update_meta_cache'  => true,
 			'update_admin_cache' => false,
 		);
 
-		$r = bp_parse_args( $args, $defaults, 'groups_template' );
+		$r = bp_parse_args(
+			$args,
+			$defaults,
+			'groups_template'
+		);
+
 		extract( $r );
 
 		$this->pag_arg  = sanitize_key( $r['page_arg'] );
@@ -212,27 +226,30 @@ class BP_Groups_Template {
 			$this->groups = array( $group );
 
 		} else {
-			$this->groups = groups_get_groups( array(
-				'type'               => $type,
-				'order'              => $order,
-				'orderby'            => $orderby,
-				'per_page'           => $this->pag_num,
-				'page'               => $this->pag_page,
-				'user_id'            => $user_id,
-				'search_terms'       => $search_terms,
-				'search_columns'     => $search_columns,
-				'meta_query'         => $meta_query,
-				'group_type'         => $group_type,
-				'group_type__in'     => $group_type__in,
-				'group_type__not_in' => $group_type__not_in,
-				'status'             => $status,
-				'include'            => $include,
-				'exclude'            => $exclude,
-				'parent_id'          => $parent_id,
-				'update_meta_cache'  => $update_meta_cache,
-				'update_admin_cache' => $update_admin_cache,
-				'show_hidden'        => $show_hidden,
-			) );
+			$this->groups = groups_get_groups(
+					array(
+					'type'               => $type,
+					'order'              => $order,
+					'orderby'            => $orderby,
+					'per_page'           => $this->pag_num,
+					'page'               => $this->pag_page,
+					'user_id'            => $user_id,
+					'search_terms'       => $search_terms,
+					'search_columns'     => $search_columns,
+					'meta_query'         => $meta_query,
+					'date_query'         => $date_query,
+					'group_type'         => $group_type,
+					'group_type__in'     => $group_type__in,
+					'group_type__not_in' => $group_type__not_in,
+					'status'             => $status,
+					'include'            => $include,
+					'exclude'            => $exclude,
+					'parent_id'          => $parent_id,
+					'update_meta_cache'  => $update_meta_cache,
+					'update_admin_cache' => $update_admin_cache,
+					'show_hidden'        => $show_hidden,
+				)
+			);
 		}
 
 		if ( 'invites' == $type ) {

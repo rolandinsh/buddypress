@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
  * Group Invites endpoints.
  *
  * Use /groups/{group_id}/invites
- * Use /groups/{group_id}/invites/{user_id}
+ * Use /groups/{group_id}/invites/{invite_id}
  *
  * @since 5.0.0
  */
@@ -81,11 +81,7 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 					'callback'            => array( $this, 'get_item' ),
 					'permission_callback' => array( $this, 'get_item_permissions_check' ),
 					'args'                => array(
-						'context' => $this->get_context_param(
-							array(
-								'default' => 'view',
-							)
-						),
+						'context' => $this->get_context_param( array( 'default' => 'view' ) ),
 					),
 				),
 				array(
@@ -182,109 +178,113 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 	 * @return bool|WP_Error
 	 */
 	public function get_items_permissions_check( $request ) {
-		$error           = new WP_Error(
+		$error = new WP_Error(
 			'bp_rest_group_invites_cannot_get_items',
 			__( 'Sorry, you are not allowed to fetch group invitations with those arguments.', 'buddypress' ),
 			array(
 				'status' => rest_authorization_required_code(),
 			)
 		);
-		$retval          = $error;
-		$group_id        = (int) $request->get_param( 'group_id' );
-		$current_user_id = (int) bp_loggedin_user_id();
-		$user_id_arg     = (int) $request->get_param( 'user_id' );
-		$inviter_id      = (int) $request->get_param( 'inviter_id' );
 
-		if ( ! is_user_logged_in() ) {
-			$retval = new WP_Error(
-				'bp_rest_authorization_required',
-				__( 'Sorry, you need to be logged in to see the group invitations.', 'buddypress' ),
-				array(
-					'status' => rest_authorization_required_code(),
-				)
-			);
-		} elseif ( $group_id ) {
-			if ( ! $user_id_arg ) {
-				$user_id_arg = $current_user_id;
-			}
+		$retval = $error;
 
-			$user = bp_rest_get_user( $user_id_arg );
+		if ( bp_current_user_can( 'bp_view', array( 'bp_component' => 'groups' ) ) ) {
+			$group_id        = (int) $request->get_param( 'group_id' );
+			$current_user_id = (int) bp_loggedin_user_id();
+			$user_id_arg     = (int) $request->get_param( 'user_id' );
+			$inviter_id      = (int) $request->get_param( 'inviter_id' );
 
-			// Check the user is valid.
-			if ( ! $user instanceof WP_User ) {
+			if ( ! is_user_logged_in() ) {
 				$retval = new WP_Error(
-					'bp_rest_member_invalid_id',
-					__( 'Invalid member ID.', 'buddypress' ),
+					'bp_rest_authorization_required',
+					__( 'Sorry, you need to be logged in to see the group invitations.', 'buddypress' ),
 					array(
-						'status' => 404,
+						'status' => rest_authorization_required_code(),
 					)
 				);
-			} else {
-				$group = $this->groups_endpoint->get_group_object( $group_id );
+			} elseif ( $group_id ) {
+				if ( ! $user_id_arg ) {
+					$user_id_arg = $current_user_id;
+				}
 
-				// Check the group is valid.
-				if ( ! $group instanceof BP_Groups_Group ) {
+				$user = bp_rest_get_user( $user_id_arg );
+
+				// Check the user is valid.
+				if ( ! $user instanceof WP_User ) {
 					$retval = new WP_Error(
-						'bp_rest_group_invalid_id',
-						__( 'Invalid group ID.', 'buddypress' ),
+						'bp_rest_member_invalid_id',
+						__( 'Invalid member ID.', 'buddypress' ),
 						array(
 							'status' => 404,
 						)
 					);
-				} elseif ( bp_current_user_can( 'bp_moderate' ) || $this->can_see( $group->id ) ) {
+				} else {
+					$group = $this->groups_endpoint->get_group_object( $group_id );
+
+					// Check the group is valid.
+					if ( ! $group instanceof BP_Groups_Group ) {
+						$retval = new WP_Error(
+							'bp_rest_group_invalid_id',
+							__( 'Invalid group ID.', 'buddypress' ),
+							array(
+								'status' => 404,
+							)
+						);
+					} elseif ( bp_current_user_can( 'bp_moderate' ) || $this->can_see( $group->id ) ) {
+						/*
+						* Users can see invitations if they
+						* - are a site admin,
+						* - are a group admin of the subject group (group_id must be specified).
+						*/
+						$retval = true;
+					} else {
+						$retval = $error;
+					}
+				}
+			} elseif ( $user_id_arg ) {
+				$user = bp_rest_get_user( $user_id_arg );
+
+				// Check the user is valid.
+				if ( ! $user instanceof WP_User ) {
+					$retval = new WP_Error(
+						'bp_rest_member_invalid_id',
+						__( 'Invalid member ID.', 'buddypress' ),
+						array(
+							'status' => 404,
+						)
+					);
+				} elseif ( bp_current_user_can( 'bp_moderate' ) || $user->ID === $current_user_id ) {
 					/*
-					 * Users can see invitations if they
-					 * - are a site admin,
-					 * - are a group admin of the subject group (group_id must be specified).
-					 */
+					* Users can see invitations if they:
+					* - are a site admin,
+					* - are the invite recipient (user_id must be specified).
+					*/
 					$retval = true;
 				} else {
 					$retval = $error;
 				}
-			}
-		} elseif ( $user_id_arg ) {
-			$user = bp_rest_get_user( $user_id_arg );
+			} elseif ( $inviter_id ) {
+				$inviter = bp_rest_get_user( $inviter_id );
 
-			// Check the user is valid.
-			if ( ! $user instanceof WP_User ) {
-				$retval = new WP_Error(
-					'bp_rest_member_invalid_id',
-					__( 'Invalid member ID.', 'buddypress' ),
-					array(
-						'status' => 404,
-					)
-				);
-			} elseif ( bp_current_user_can( 'bp_moderate' ) || $user->ID === $current_user_id ) {
-				/*
-				 * Users can see invitations if they:
-				 * - are a site admin,
-				 * - are the invite recipient (user_id must be specified).
-				 */
-				$retval = true;
-			} else {
-				$retval = $error;
-			}
-		} elseif ( $inviter_id ) {
-			$inviter = bp_rest_get_user( $inviter_id );
-
-			// Check the inviter is valid.
-			if ( ! $inviter instanceof WP_User ) {
-				$retval = new WP_Error(
-					'bp_rest_member_invalid_id',
-					__( 'Invalid member ID.', 'buddypress' ),
-					array(
-						'status' => 404,
-					)
-				);
-			} elseif ( bp_current_user_can( 'bp_moderate' ) || $inviter->ID === $current_user_id ) {
-				/*
-				 * Users can see invitations if they:
-				 * - are a site admin,
-				 * - are the inviter (inviter_id must be specified).
-				 */
-				$retval = true;
-			} else {
-				$retval = $error;
+				// Check the inviter is valid.
+				if ( ! $inviter instanceof WP_User ) {
+					$retval = new WP_Error(
+						'bp_rest_member_invalid_id',
+						__( 'Invalid member ID.', 'buddypress' ),
+						array(
+							'status' => 404,
+						)
+					);
+				} elseif ( bp_current_user_can( 'bp_moderate' ) || $inviter->ID === $current_user_id ) {
+					/*
+					* Users can see invitations if they:
+					* - are a site admin,
+					* - are the inviter (inviter_id must be specified).
+					*/
+					$retval = true;
+				} else {
+					$retval = $error;
+				}
 			}
 		}
 
@@ -338,8 +338,7 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 	 * @return true|WP_Error
 	 */
 	public function get_item_permissions_check( $request ) {
-		$user_id = bp_loggedin_user_id();
-		$retval  = new WP_Error(
+		$retval = new WP_Error(
 			'bp_rest_authorization_required',
 			__( 'Sorry, you are not allowed to perform this action.', 'buddypress' ),
 			array(
@@ -347,42 +346,46 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 			)
 		);
 
-		if ( ! $user_id ) {
-			$retval = new WP_Error(
-				'bp_rest_authorization_required',
-				__( 'Sorry, you need to be logged in to see the group invitations.', 'buddypress' ),
-				array(
-					'status' => rest_authorization_required_code(),
-				)
-			);
-		} else {
-			$invite = $this->fetch_single_invite( $request->get_param( 'invite_id' ) );
+		if ( bp_current_user_can( 'bp_view', array( 'bp_component' => 'groups' ) ) ) {
+			$user_id = bp_loggedin_user_id();
 
-			if ( ! $invite ) {
+			if ( ! $user_id ) {
 				$retval = new WP_Error(
-					'bp_rest_group_invite_invalid_id',
-					__( 'Invalid group invitation ID.', 'buddypress' ),
-					array(
-						'status' => 404,
-					)
-				);
-			} elseif ( bp_current_user_can( 'bp_moderate' ) || $this->can_see( $invite->item_id ) || in_array( $user_id, array( $invite->user_id, $invite->inviter_id ), true ) ) {
-				/*
-				 * Users can see a specific invitation if they
-				 * - are a site admin
-				 * - are a group admin of the subject group
-				 * - are the invite recipient
-				 * - are the inviter
-				 */
-				$retval = true;
-			} else {
-				$retval = new WP_Error(
-					'bp_rest_group_invites_cannot_get_item',
-					__( 'Sorry, you are not allowed to fetch an invitation.', 'buddypress' ),
+					'bp_rest_authorization_required',
+					__( 'Sorry, you need to be logged in to see the group invitations.', 'buddypress' ),
 					array(
 						'status' => rest_authorization_required_code(),
 					)
 				);
+			} else {
+				$invite = $this->fetch_single_invite( $request->get_param( 'invite_id' ) );
+
+				if ( ! $invite ) {
+					$retval = new WP_Error(
+						'bp_rest_group_invite_invalid_id',
+						__( 'Invalid group invitation ID.', 'buddypress' ),
+						array(
+							'status' => 404,
+						)
+					);
+				} elseif ( bp_current_user_can( 'bp_moderate' ) || $this->can_see( $invite->item_id ) || in_array( $user_id, array( $invite->user_id, $invite->inviter_id ), true ) ) {
+					/*
+					* Users can see a specific invitation if they
+					* - are a site admin
+					* - are a group admin of the subject group
+					* - are the invite recipient
+					* - are the inviter
+					*/
+					$retval = true;
+				} else {
+					$retval = new WP_Error(
+						'bp_rest_group_invites_cannot_get_item',
+						__( 'Sorry, you are not allowed to fetch an invitation.', 'buddypress' ),
+						array(
+							'status' => rest_authorization_required_code(),
+						)
+					);
+				}
 			}
 		}
 
@@ -510,18 +513,16 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 							'status' => 404,
 						)
 					);
-				} else {
-					if ( bp_current_user_can( 'bp_moderate' ) || bp_loggedin_user_id() === $inviter_id_arg ) {
+				} elseif ( bp_current_user_can( 'bp_moderate' ) || bp_loggedin_user_id() === $inviter_id_arg ) {
 						$retval = true;
-					} else {
-						$retval = new WP_Error(
-							'bp_rest_group_invite_cannot_create_item',
-							__( 'Sorry, you are not allowed to create the invitation as requested.', 'buddypress' ),
-							array(
-								'status' => rest_authorization_required_code(),
-							)
-						);
-					}
+				} else {
+					$retval = new WP_Error(
+						'bp_rest_group_invite_cannot_create_item',
+						__( 'Sorry, you are not allowed to create the invitation as requested.', 'buddypress' ),
+						array(
+							'status' => rest_authorization_required_code(),
+						)
+					);
 				}
 			}
 		}
@@ -779,20 +780,21 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param BP_Invitation   $invite  Invite object.
+	 * @param BP_Invitation   $invite  The invitation object.
 	 * @param WP_REST_Request $request Full details about the request.
 	 * @return WP_REST_Response
 	 */
 	public function prepare_item_for_response( $invite, $request ) {
 		$data = array(
-			'id'            => $invite->id,
-			'user_id'       => $invite->user_id,
-			'invite_sent'   => $invite->invite_sent,
-			'inviter_id'    => $invite->inviter_id,
-			'group_id'      => $invite->item_id,
-			'date_modified' => bp_rest_prepare_date_response( $invite->date_modified ),
-			'type'          => $invite->type,
-			'message'       => array(
+			'id'                => (int) $invite->id,
+			'user_id'           => (int) $invite->user_id,
+			'invite_sent'       => (int) $invite->invite_sent,
+			'inviter_id'        => (int) $invite->inviter_id,
+			'group_id'          => (int) $invite->item_id,
+			'date_modified'     => bp_rest_prepare_date_response( $invite->date_modified, get_date_from_gmt( $invite->date_modified ) ),
+			'date_modified_gmt' => bp_rest_prepare_date_response( $invite->date_modified ),
+			'type'              => (string) $invite->type,
+			'message'           => array(
 				'raw'      => $invite->content,
 				'rendered' => apply_filters( 'the_content', $invite->content ),
 			),
@@ -803,6 +805,7 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 		$data     = $this->filter_response_by_context( $data, $context );
 		$response = rest_ensure_response( $data );
 
+		// Add prepare links.
 		$response->add_links( $this->prepare_links( $invite ) );
 
 		/**
@@ -812,7 +815,7 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 		 *
 		 * @param WP_REST_Response $response The response data.
 		 * @param WP_REST_Request  $request  Request used to generate the response.
-		 * @param BP_Invitation    $invite   The invite object.
+		 * @param BP_Invitation    $invite   The invitation object.
 		 */
 		return apply_filters( 'bp_rest_group_invites_prepare_value', $response, $request, $invite );
 	}
@@ -823,7 +826,7 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 	 * @since 5.0.0
 	 *
 	 * @param BP_Invitation $invite Invite object.
-	 * @return array Links for the given plugin.
+	 * @return array
 	 */
 	protected function prepare_links( $invite ) {
 		$base = sprintf( '/%s/%s/', $this->namespace, $this->rest_base );
@@ -903,6 +906,7 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 			$key                            = 'create_item';
 			$args['message']['type']        = 'string';
 			$args['message']['description'] = __( 'The optional message to send to the invited user.', 'buddypress' );
+			$args['message']['default']     = '';
 			$args['send_invite']            = $args['invite_sent'];
 			$args['inviter_id']['default']  = bp_loggedin_user_id();
 			$args['group_id']['required']   = true;
@@ -946,46 +950,54 @@ class BP_REST_Group_Invites_Endpoint extends WP_REST_Controller {
 				'title'      => 'bp_group_invites',
 				'type'       => 'object',
 				'properties' => array(
-					'id'            => array(
+					'id'                => array(
 						'context'     => array( 'view', 'edit' ),
 						'description' => __( 'A unique numeric ID for the BP Invitation object.', 'buddypress' ),
 						'type'        => 'integer',
 						'readonly'    => true,
 					),
-					'user_id'       => array(
+					'user_id'           => array(
 						'context'     => array( 'view', 'edit' ),
 						'description' => __( 'The ID of the user who is invited to join the Group.', 'buddypress' ),
 						'type'        => 'integer',
 					),
-					'invite_sent'   => array(
+					'invite_sent'       => array(
 						'context'     => array( 'view', 'edit' ),
 						'description' => __( 'Whether the invite has been sent to the invitee.', 'buddypress' ),
 						'type'        => 'boolean',
 					),
-					'inviter_id'    => array(
+					'inviter_id'        => array(
 						'context'     => array( 'view', 'edit' ),
 						'description' => __( 'The ID of the user who made the invite.', 'buddypress' ),
 						'type'        => 'integer',
 					),
-					'group_id'      => array(
+					'group_id'          => array(
 						'context'     => array( 'view', 'edit' ),
 						'description' => __( 'The ID of the group to which the user has been invited.', 'buddypress' ),
 						'type'        => 'integer',
 					),
-					'date_modified' => array(
+					'date_modified'     => array(
 						'context'     => array( 'view', 'edit' ),
-						'description' => __( "The date the object was created or last updated, in the site's timezone.", 'buddypress' ),
-						'type'        => 'string',
+						'description' => __( 'The date the object was created or last updated, in the site\'s timezone.', 'buddypress' ),
+						'readonly'    => true,
+						'type'        => array( 'string', 'null' ),
 						'format'      => 'date-time',
 					),
-					'type'          => array(
+					'date_modified_gmt' => array(
+						'context'     => array( 'view', 'edit' ),
+						'description' => __( 'The date the object was created or last updated, as GMT.', 'buddypress' ),
+						'readonly'    => true,
+						'type'        => array( 'string', 'null' ),
+						'format'      => 'date-time',
+					),
+					'type'              => array(
 						'context'     => array( 'view', 'edit' ),
 						'description' => __( 'Invitation or request.', 'buddypress' ),
 						'type'        => 'string',
 						'enum'        => array( 'invite', 'request' ),
 						'default'     => 'invite',
 					),
-					'message'       => array(
+					'message'           => array(
 						'context'     => array( 'view', 'edit' ),
 						'description' => __( 'The raw and rendered versions for the content of the message.', 'buddypress' ),
 						'type'        => 'object',

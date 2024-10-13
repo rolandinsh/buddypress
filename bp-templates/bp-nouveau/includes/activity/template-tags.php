@@ -3,7 +3,7 @@
  * Activity Template tags
  *
  * @since 3.0.0
- * @version 8.1.0
+ * @version 12.0.0
  */
 
 // Exit if accessed directly.
@@ -64,6 +64,15 @@ function bp_nouveau_after_activity_directory_content() {
 }
 
 /**
+ * Prints the JS Templates used to render the Activity Post Form.
+ *
+ * @since 10.0.0
+ */
+function bp_nouveau_activity_print_post_form_templates() {
+	bp_get_template_part( 'common/js-templates/activity/form' );
+}
+
+/**
  * Enqueue needed scripts for the Activity Post Form
  *
  * @since 3.0.0
@@ -72,6 +81,13 @@ function bp_nouveau_after_activity_directory_content() {
 function bp_nouveau_before_activity_post_form() {
 	if ( bp_nouveau_current_user_can( 'publish_activity' ) ) {
 		wp_enqueue_script( 'bp-nouveau-activity-post-form' );
+
+		/**
+		 * Get the templates to manage Group Members using the BP REST API.
+		 *
+		 * @since 10.0.0 Hook to the `wp_footer` action to print the JS templates.
+		 */
+		add_action( 'wp_footer', 'bp_nouveau_activity_print_post_form_templates' );
 	}
 }
 
@@ -81,10 +97,6 @@ function bp_nouveau_before_activity_post_form() {
  * @since 3.0.0
  */
 function bp_nouveau_after_activity_post_form() {
-	if ( bp_nouveau_current_user_can( 'publish_activity' ) ) {
-		bp_get_template_part( 'common/js-templates/activity/form' );
-	}
-
 	/**
 	 * Fires after the activity post form.
 	 *
@@ -144,6 +156,24 @@ function bp_nouveau_activity_hook( $when = '', $suffix = '' ) {
 	}
 
 	bp_nouveau_hook( $hook );
+}
+
+/**
+ * Output the `data-bp-activity-id` attribute.
+ *
+ * @since 10.0.0
+ */
+function bp_nouveau_activity_data_attribute_id() {
+	printf( 'data-bp-activity-id="%d"', (int) bp_get_activity_id() );
+}
+
+/**
+ * Output the `data-bp-activity-comment-id` attribute.
+ *
+ * @since 12.0.0
+ */
+function bp_nouveau_activity_comment_data_attribute_id() {
+	printf( 'data-bp-activity-comment-id="%d"', (int) bp_get_activity_comment_id() );
 }
 
 /**
@@ -240,6 +270,8 @@ function bp_nouveau_activity_entry_buttons( $args = array() ) {
 	 *
 	 * @todo This function is too large and needs refactoring and reviewing.
 	 * @since 3.0.0
+	 *
+	 * @global BP_Activity_Template $activities_template The Activity template loop.
 	 *
 	 * @param array $args See bp_nouveau_wrapper() for the description of parameters.
 	 * @return array      Activity action buttons used into an Activity Loop.
@@ -517,7 +549,13 @@ function bp_nouveau_activity_entry_buttons( $args = array() ) {
 			}
 
 			$buttons['activity_spam']['button_attr'][ $data_element ] = wp_nonce_url(
-				bp_get_root_domain() . '/' . bp_nouveau_get_component_slug( 'activity' ) . '/spam/' . $activity_id . '/',
+				bp_rewrites_get_url(
+					array(
+						'component_id'                 => 'activity',
+						'single_item_action'           => 'spam',
+						'single_item_action_variables' => array( $activity_id ),
+					)
+				),
 				'bp_activity_akismet_spam_' . $activity_id
 			);
 		}
@@ -611,14 +649,12 @@ function bp_nouveau_activity_recurse_comments( $comment ) {
 		return;
 	}
 
-	/**
-	 * Filters the opening tag for the template that lists activity comments.
-	 *
-	 * @since 1.6.0
-	 *
-	 * @param string $value Opening tag for the HTML markup to use.
-	 */
-	echo apply_filters( 'bp_activity_recurse_comments_start_ul', '<ul>' );
+	// phpcs:ignore WordPress.Security.EscapeOutput
+	echo apply_filters(
+		/** This filter is documented in bp-activity/bp-activity-template.php. */
+		'bp_activity_recurse_comments_start_ul',
+		'<ul>'
+	);
 
 	foreach ( (array) $comment->children as $comment_child ) {
 
@@ -644,14 +680,12 @@ function bp_nouveau_activity_recurse_comments( $comment ) {
 		unset( $activities_template->activity->current_comment );
 	}
 
-	/**
-	 * Filters the closing tag for the template that list activity comments.
-	 *
-	 * @since 1.6.0
-	 *
-	 * @param string $value Closing tag for the HTML markup to use.
-	 */
-	echo apply_filters( 'bp_activity_recurse_comments_end_ul', '</ul>' );
+	// phpcs:ignore WordPress.Security.EscapeOutput
+	echo apply_filters(
+		/** This filter is documented in bp-activity/bp-activity-template.php. */
+		'bp_activity_recurse_comments_end_ul',
+		'</ul>'
+	);
 }
 
 /**
@@ -660,7 +694,20 @@ function bp_nouveau_activity_recurse_comments( $comment ) {
  * @since 3.0.0
  */
 function bp_nouveau_activity_comment_action() {
-	echo bp_nouveau_get_activity_comment_action();
+	echo wp_kses(
+		bp_nouveau_get_activity_comment_action(),
+		array(
+			'a'    => array(
+				'href'  => true,
+				'class' => true,
+			),
+			'time' => array(
+				'datetime'          => true,
+				'class'             => true,
+				'data-bp-timestamp' => true,
+			),
+		)
+	);
 }
 
 	/**
@@ -733,6 +780,8 @@ function bp_nouveau_activity_comment_buttons( $args = array() ) {
 	 * Get the action buttons for the activity comments
 	 *
 	 * @since 3.0.0
+	 *
+	 * @global BP_Activity_Template $activities_template The Activity template loop.
 	 *
 	 * @param array $args Optional. See bp_nouveau_wrapper() for the description of parameters.
 	 *
@@ -845,7 +894,17 @@ function bp_nouveau_activity_comment_buttons( $args = array() ) {
 			}
 
 			$buttons['activity_comment_spam']['button_attr'][ $data_element ] = wp_nonce_url(
-				bp_get_root_domain() . '/' . bp_nouveau_get_component_slug( 'activity' ) . '/spam/' . $activity_comment_id . '/?cid=' . $activity_comment_id,
+				add_query_arg(
+					'cid',
+					$activity_comment_id,
+					bp_rewrites_get_url(
+						array(
+							'component_id'                 => 'activity',
+							'single_item_action'           => 'spam',
+							'single_item_action_variables' => array( $activity_comment_id ),
+						)
+					)
+				),
 				'bp_activity_akismet_spam_' . $activity_comment_id
 			);
 		}

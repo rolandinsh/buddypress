@@ -118,10 +118,8 @@ class BP_REST_Notifications_Endpoint extends WP_REST_Controller {
 
 		if ( ! empty( $args['user_ids'] ) ) {
 			$args['user_id'] = $args['user_ids'];
-		} else {
-			if ( empty( $args['user_id'] ) ) {
+		} elseif ( empty( $args['user_id'] ) ) {
 				$args['user_id'] = bp_loggedin_user_id();
-			}
 		}
 
 		if ( empty( $request->get_param( 'component_name' ) ) ) {
@@ -529,14 +527,15 @@ class BP_REST_Notifications_Endpoint extends WP_REST_Controller {
 	 */
 	public function prepare_item_for_response( $notification, $request ) {
 		$data = array(
-			'id'                => $notification->id,
-			'user_id'           => $notification->user_id,
-			'item_id'           => $notification->item_id,
-			'secondary_item_id' => $notification->secondary_item_id,
+			'id'                => (int) $notification->id,
+			'user_id'           => (int) $notification->user_id,
+			'item_id'           => (int) $notification->item_id,
+			'secondary_item_id' => (int) $notification->secondary_item_id,
 			'component'         => $notification->component_name,
 			'action'            => $notification->component_action,
-			'date'              => bp_rest_prepare_date_response( $notification->date_notified ),
-			'is_new'            => $notification->is_new,
+			'date'              => bp_rest_prepare_date_response( $notification->date_notified, get_date_from_gmt( $notification->date_notified ) ),
+			'date_gmt'          => bp_rest_prepare_date_response( $notification->date_notified ),
+			'is_new'            => (int) $notification->is_new,
 		);
 
 		$context  = ! empty( $request->get_param( 'context' ) ) ? $request->get_param( 'context' ) : 'view';
@@ -544,6 +543,7 @@ class BP_REST_Notifications_Endpoint extends WP_REST_Controller {
 		$data     = $this->filter_response_by_context( $data, $context );
 		$response = rest_ensure_response( $data );
 
+		// Add prepare links.
 		$response->add_links( $this->prepare_links( $notification ) );
 
 		/**
@@ -636,7 +636,7 @@ class BP_REST_Notifications_Endpoint extends WP_REST_Controller {
 	 * @since 5.0.0
 	 *
 	 * @param BP_Notifications_Notification $notification Notification item.
-	 * @return array Links for the given plugin.
+	 * @return array
 	 */
 	protected function prepare_links( $notification ) {
 		$base = sprintf( '/%1$s/%2$s/', $this->namespace, $this->rest_base );
@@ -690,7 +690,7 @@ class BP_REST_Notifications_Endpoint extends WP_REST_Controller {
 		}
 
 		// Embed Blog.
-		if ( bp_is_active( 'blogs' ) && buddypress()->blogs->id === $notification->component_name && ! empty( $notification->item_id ) ) {
+		if ( is_multisite() && bp_is_active( 'blogs' ) && buddypress()->blogs->id === $notification->component_name && ! empty( $notification->item_id ) ) {
 			$links['blog'] = array(
 				'embeddable' => true,
 				'href'       => rest_url(
@@ -837,7 +837,15 @@ class BP_REST_Notifications_Endpoint extends WP_REST_Controller {
 					),
 					'date'              => array(
 						'description' => __( 'The date the notification was created, in the site\'s timezone.', 'buddypress' ),
-						'type'        => 'string',
+						'readonly'    => true,
+						'type'        => array( 'string', 'null' ),
+						'format'      => 'date-time',
+						'context'     => array( 'view', 'edit' ),
+					),
+					'date_gmt'          => array(
+						'description' => __( 'The date the notification was created, as GMT.', 'buddypress' ),
+						'readonly'    => true,
+						'type'        => array( 'string', 'null' ),
 						'format'      => 'date-time',
 						'context'     => array( 'view', 'edit' ),
 					),

@@ -221,8 +221,8 @@ function bp_settings_personal_data_exporter( $email_address, $page ) {
  *
  * @since 4.0.0
  *
- * @param int WP user ID.
- * @return WP_User_Request|false WP_User_Request object on success, boolean false on failure.
+ * @param int $user_id WP user ID.
+ * @return WP_User_Request|bool WP_User_Request object on success, bool false on failure.
  */
 function bp_settings_get_personal_data_request( $user_id = 0 ) {
 	if ( empty( $user_id ) ) {
@@ -248,9 +248,7 @@ function bp_settings_get_personal_data_request( $user_id = 0 ) {
 	) );
 
 	if ( ! empty( $query->post ) ) {
-		// WP 5.4 changed the user request function name to wp_get_user_request()
-		$user_request = bp_is_running_wp( '4.9.6' ) ? 'wp_get_user_request' : 'wp_get_user_request_data';
-		return $user_request( $query->post->ID );
+		return wp_get_user_request( $query->post->ID );
 	} else {
 		return false;
 	}
@@ -265,7 +263,7 @@ function bp_settings_get_personal_data_request( $user_id = 0 ) {
  * @return string Formatted date.
  */
 function bp_settings_get_personal_data_expiration_date( WP_User_Request $request ) {
-	/** This filter is documented in wp-admin/includes/file.php */
+	/** This filter is documented in wp-includes/functions.php */
 	$expiration = apply_filters( 'wp_privacy_export_expiration', 3 * DAY_IN_SECONDS );
 
 	return bp_format_time( $request->completed_timestamp + $expiration, true );
@@ -292,7 +290,12 @@ function bp_settings_get_personal_data_confirmation_date( WP_User_Request $reque
  * @return string Export file URL.
  */
 function bp_settings_get_personal_data_export_url( WP_User_Request $request ) {
-	return get_post_meta( $request->ID, '_export_file_url', true );
+	if ( ! bp_settings_personal_data_export_exists( $request ) ) {
+		return '';
+	}
+
+	$file = get_post_meta( $request->ID, '_export_file_name', true );
+	return wp_privacy_exports_url() . $file;
 }
 
 /**
@@ -304,12 +307,12 @@ function bp_settings_get_personal_data_export_url( WP_User_Request $request ) {
  * @return bool
  */
 function bp_settings_personal_data_export_exists( WP_User_Request $request ) {
-	$file = get_post_meta( $request->ID, '_export_file_path', true );
-	if ( file_exists( $file ) ) {
-		return true;
-	} else {
+	$file = get_post_meta( $request->ID, '_export_file_name', true );
+	if ( empty( $file ) ) {
 		return false;
 	}
+
+	return file_exists( wp_privacy_exports_dir() . $file );
 }
 
 /**
@@ -357,13 +360,46 @@ function bp_settings_data_exporter_items() {
 		 * @param string $friendly_name Data exporter friendly name.
 		 * @param string $exporter      Internal exporter name.
 		 */
-		$item = apply_filters( 'bp_settings_data_exporter_name', esc_html( $friendly_name ), $exporter );
+		$item = apply_filters( 'bp_settings_data_exporter_name', $friendly_name, $exporter );
 	?>
 
-		<li><?php echo $item; ?></li>
+		<li><?php echo esc_html( $item ); ?></li>
 
 	<?php endforeach; ?>
 	</ul>
 
 <?php
+}
+
+/**
+ * Whether a user can delete self account from front-end.
+ *
+ * @since 12.0.0
+ *
+ * @return bool True if user can delete self account from front-end. False otherwise.
+ */
+function bp_settings_can_delete_self_account() {
+	return ! user_can( bp_displayed_user_id(), 'delete_users' );
+}
+
+/**
+ * Whether to show the Delete account front-end nav.
+ *
+ * @since 12.0.0
+ *
+ * @return bool True if user can be shown the Delete account nav. False otherwise.
+ */
+function bp_settings_show_delete_account_nav() {
+	return ( ! bp_disable_account_deletion() && bp_is_my_profile() ) || bp_current_user_can( 'delete_users' );
+}
+
+/**
+ * Whether to show the Capability front-end nav.
+ *
+ * @since 12.0.0
+ *
+ * @return bool True if user can be shown the Capability nav. False otherwise.
+ */
+function bp_settings_show_capability_nav() {
+	return ! bp_is_my_profile();
 }

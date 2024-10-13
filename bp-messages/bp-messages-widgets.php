@@ -3,19 +3,12 @@
  * BuddyPress Messages Widgets.
  *
  * @package BuddyPress
- * @subpackage Messages
+ * @subpackage MessagesWidgets
  * @since 1.9.0
+ * @deprecated 12.0.0
  */
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
 
-/**
- * Register widgets for the Messages component.
- *
- * @since 1.9.0
- */
-function bp_messages_register_widgets() {
-	add_action( 'widgets_init', function() { register_widget( 'BP_Messages_Sitewide_Notices_Widget' ); } );
-}
-add_action( 'bp_register_widgets', 'bp_messages_register_widgets' );
+_deprecated_file( basename( __FILE__ ), '12.0.0', '', esc_html__( 'BuddyPress does not include Legacy Widgets anymore, you can restore it using the BP Classic plugin', 'buddypress' ) );

@@ -39,8 +39,7 @@ class BP_XProfile_Field_Type_Multiselectbox extends BP_XProfile_Field_Type {
 		 *
 		 * @since 2.0.0
 		 *
-		 * @param BP_XProfile_Field_Type_Multiselectbox $this Current instance of
-		 *                                                    the field type multiple select box.
+		 * @param BP_XProfile_Field_Type_Multiselectbox $field_type Current instance of the field type class.
 		 */
 		do_action( 'bp_xprofile_field_type_multiselectbox', $this );
 	}
@@ -67,11 +66,15 @@ class BP_XProfile_Field_Type_Multiselectbox extends BP_XProfile_Field_Type {
 			$user_id = bp_displayed_user_id();
 		}
 
-		$r = bp_parse_args( $raw_properties, array(
-			'multiple' => 'multiple',
-			'id'       => bp_get_the_profile_field_input_name() . '[]',
-			'name'     => bp_get_the_profile_field_input_name() . '[]',
-		) ); ?>
+		$r = bp_parse_args(
+			$raw_properties,
+			array(
+				'multiple' => 'multiple',
+				'id'       => bp_get_the_profile_field_input_name() . '[]',
+				'name'     => bp_get_the_profile_field_input_name() . '[]',
+			)
+		);
+		?>
 
 		<legend id="<?php bp_the_profile_field_input_name(); ?>-1">
 			<?php bp_the_profile_field_name(); ?>
@@ -83,9 +86,9 @@ class BP_XProfile_Field_Type_Multiselectbox extends BP_XProfile_Field_Type {
 		/** This action is documented in bp-xprofile/bp-xprofile-classes */
 		do_action( bp_get_the_profile_field_errors_action() ); ?>
 
-		<select <?php echo $this->get_edit_field_html_elements( $r ); ?> aria-labelledby="<?php bp_the_profile_field_input_name(); ?>-1" aria-describedby="<?php bp_the_profile_field_input_name(); ?>-3">
+		<select <?php $this->output_edit_field_html_elements( $r ); ?> aria-labelledby="<?php bp_the_profile_field_input_name(); ?>-1" aria-describedby="<?php bp_the_profile_field_input_name(); ?>-3">
 			<?php bp_the_profile_field_options( array(
-				'user_id' => $user_id
+				'user_id' => $user_id,
 			) ); ?>
 		</select>
 
@@ -93,14 +96,24 @@ class BP_XProfile_Field_Type_Multiselectbox extends BP_XProfile_Field_Type {
 			<p class="description" id="<?php bp_the_profile_field_input_name(); ?>-3"><?php bp_the_profile_field_description(); ?></p>
 		<?php endif; ?>
 
-		<?php if ( ! bp_get_the_profile_field_is_required() ) : ?>
+		<?php if ( ! bp_get_the_profile_field_is_required() ) :
 
-			<a class="clear-value" href="javascript:clear( '<?php echo esc_js( bp_get_the_profile_field_input_name() ); ?>[]' );">
+			$clear = 'clear';
+			if ( is_admin() && ! wp_doing_ajax() ) {
+				$clear = 'bp.clear';
+			}
+
+			$js_clear = sprintf( 'javascript:%1$s( \'%2$s[]\' );', $clear, esc_js( bp_get_the_profile_field_input_name() ) );
+
+			// phpcs:disable WordPress.Security.EscapeOutput
+		?>
+
+			<a class="clear-value" href="<?php echo $js_clear; ?>">
 				<?php esc_html_e( 'Clear', 'buddypress' ); ?>
 			</a>
 
-		<?php endif; ?>
-	<?php
+		<?php endif;
+		// phpcs:enable
 	}
 
 	/**
@@ -124,8 +137,8 @@ class BP_XProfile_Field_Type_Multiselectbox extends BP_XProfile_Field_Type {
 		$options = $this->field_obj->get_children();
 		$html    = '';
 
-		if ( empty( $original_option_values ) && ! empty( $_POST['field_' . $this->field_obj->id] ) ) {
-			$original_option_values = sanitize_text_field( $_POST['field_' . $this->field_obj->id] );
+		if ( empty( $original_option_values ) && ! empty( $_POST[ 'field_' . $this->field_obj->id ] ) ) {
+			$original_option_values = sanitize_text_field( $_POST[ 'field_' . $this->field_obj->id ] );
 		}
 
 		$option_values = ( $original_option_values ) ? (array) $original_option_values : array();
@@ -134,17 +147,17 @@ class BP_XProfile_Field_Type_Multiselectbox extends BP_XProfile_Field_Type {
 
 			// Check for updated posted values, but errors preventing them from
 			// being saved first time.
-			foreach( $option_values as $i => $option_value ) {
-				if ( isset( $_POST['field_' . $this->field_obj->id] ) && $_POST['field_' . $this->field_obj->id][$i] != $option_value ) {
-					if ( ! empty( $_POST['field_' . $this->field_obj->id][$i] ) ) {
-						$option_values[] = sanitize_text_field( $_POST['field_' . $this->field_obj->id][$i] );
+			foreach ( $option_values as $i => $option_value ) {
+				if ( isset( $_POST[ 'field_' . $this->field_obj->id ] ) && $_POST[ 'field_' . $this->field_obj->id ][ $i ] != $option_value ) {
+					if ( ! empty( $_POST[ 'field_' . $this->field_obj->id ][ $i ] ) ) {
+						$option_values[] = sanitize_text_field( $_POST[ 'field_' . $this->field_obj->id ][ $i ] );
 					}
 				}
 			}
 
 			// Run the allowed option name through the before_save filter, so
 			// we'll be sure to get a match.
-			$allowed_options = xprofile_sanitize_data_value_before_save( $options[$k]->name, false, false );
+			$allowed_options = xprofile_sanitize_data_value_before_save( $options[ $k ]->name, false, false );
 
 			// First, check to see whether the user-entered value matches.
 			if ( in_array( $allowed_options, $option_values ) ) {
@@ -152,7 +165,7 @@ class BP_XProfile_Field_Type_Multiselectbox extends BP_XProfile_Field_Type {
 			}
 
 			// Then, if the user has not provided a value, check for defaults.
-			if ( ! is_array( $original_option_values ) && empty( $option_values ) && ! empty( $options[$k]->is_default_option ) ) {
+			if ( ! is_array( $original_option_values ) && empty( $option_values ) && ! empty( $options[ $k ]->is_default_option ) ) {
 				$selected = ' selected="selected"';
 			}
 
@@ -167,9 +180,10 @@ class BP_XProfile_Field_Type_Multiselectbox extends BP_XProfile_Field_Type {
 			 * @param string $selected Current selected value.
 			 * @param string $k        Current index in the foreach loop.
 			 */
-			$html .= apply_filters( 'bp_get_the_profile_field_options_multiselect', '<option' . $selected . ' value="' . esc_attr( stripslashes( $options[$k]->name ) ) . '">' . esc_html( stripslashes( $options[$k]->name ) ) . '</option>', $options[$k], $this->field_obj->id, $selected, $k );
+			$html .= apply_filters( 'bp_get_the_profile_field_options_multiselect', '<option' . $selected . ' value="' . esc_attr( stripslashes( $options[ $k ]->name ) ) . '">' . esc_html( stripslashes( $options[ $k ]->name ) ) . '</option>', $options[ $k ], $this->field_obj->id, $selected, $k );
 		}
 
+		// phpcs:ignore WordPress.Security.EscapeOutput
 		echo $html;
 	}
 
@@ -183,15 +197,19 @@ class BP_XProfile_Field_Type_Multiselectbox extends BP_XProfile_Field_Type {
 	 * @param array $raw_properties Optional key/value array of permitted attributes that you want to add.
 	 */
 	public function admin_field_html( array $raw_properties = array() ) {
-		$r = bp_parse_args( $raw_properties, array(
-			'multiple' => 'multiple'
-		) ); ?>
+		$r = bp_parse_args(
+			$raw_properties,
+			array(
+				'multiple' => 'multiple',
+			)
+		);
+		?>
 
 		<label for="<?php bp_the_profile_field_input_name(); ?>" class="screen-reader-text"><?php
 			/* translators: accessibility text */
 			esc_html_e( 'Select', 'buddypress' );
 		?></label>
-		<select <?php echo $this->get_edit_field_html_elements( $r ); ?>>
+		<select <?php $this->output_edit_field_html_elements( $r ); ?>>
 			<?php bp_the_profile_field_options(); ?>
 		</select>
 

@@ -3,7 +3,7 @@
  * Common functions
  *
  * @since 3.0.0
- * @version 9.0.0
+ * @version 14.0.0
  */
 
 // Exit if accessed directly.
@@ -115,6 +115,10 @@ function bp_nouveau_ajax_querystring( $query_string, $object ) {
 	// To get newest activities.
 	if ( ! empty( $post_query['offset'] ) ) {
 		$qs[] = 'offset=' . intval( $post_query['offset'] );
+	}
+
+	if ( ! empty( $post_query['offset_lower'] ) ) {
+		$qs[] = 'offset_lower=' . intval( $post_query['offset_lower'] );
 	}
 
 	$object_search_text = bp_get_search_default_text( $object );
@@ -244,7 +248,7 @@ function bp_nouveau_wrapper( $args = array() ) {
 	 * We need to to this because bp_current_component() is using the component slugs which can differ
 	 * from the component ID.
 	 */
-	$current_component_id = bp_core_get_active_components( array( 'slug' => bp_current_component() ) );
+	$current_component_id = bp_core_get_active_components( array( 'id' => bp_current_component() ) );
 	if ( $current_component_id && 1 === count( $current_component_id ) ) {
 		$current_component_id = reset( $current_component_id );
 	} else {
@@ -300,7 +304,7 @@ function bp_nouveau_wrapper( $args = array() ) {
 		$container_classes = ' class="' . join( ' ', array_map( 'sanitize_html_class', $r['container_classes'] ) ) . '"';
 	}
 
-	// Print the wrapper and its content.
+	// phpcs:ignore WordPress.Security.EscapeOutput
 	printf( '<%1$s%2$s%3$s>%4$s</%1$s>', $container, $container_id, $container_classes, $output );
 }
 
@@ -516,14 +520,14 @@ function bp_nouveau_parse_hooked_options( $hook = '', $filters = array() ) {
 }
 
 /**
- * Get Dropdawn filters for the current component of the one passed in params
+ * Get Dropdown filters for the current component of the one passed in params.
  *
  * @since 3.0.0
  *
- * @param string $context   'directory', 'user' or 'group'
- * @param string $component The BuddyPress component ID
+ * @param string $context   'directory', 'user' or 'group'.
+ * @param string $component The BuddyPress component ID.
  *
- * @return array the dropdown filters
+ * @return array the dropdown filters.
  */
 function bp_nouveau_get_component_filters( $context = '', $component = '' ) {
 	$filters = array();
@@ -636,7 +640,6 @@ function bp_nouveau_get_temporary_setting( $option = '', $retval = false ) {
  */
 function bp_nouveau_get_appearance_settings( $option = '' ) {
 	$default_args = array(
-		'avatar_style'       => 0,
 		'global_alignment'   => 'alignwide',
 		'user_front_page'    => 0,
 		'user_front_bio'     => 0,
@@ -659,27 +662,33 @@ function bp_nouveau_get_appearance_settings( $option = '' ) {
 	}
 
 	if ( bp_is_active( 'groups' ) ) {
-		$default_args = array_merge( $default_args, array(
-			'group_front_page'        => 0,
-			'group_front_boxes'       => 0,
-			'group_front_description' => 0,
-			'group_nav_display'       => 0,       // O is default (horizontally). 1 is vertically.
-			'group_nav_order'         => array(),
-			'group_nav_tabs'          => 0,
-			'group_subnav_tabs'       => 0,
-			'groups_create_tabs'      => 1,
-			'groups_layout'           => 1,
-			'members_group_layout'    => 1,
-			'groups_dir_layout'       => 0,
-			'groups_dir_tabs'         => 0,
-		) );
+		$default_args = array_merge(
+			$default_args,
+			array(
+				'group_front_page'        => 0,
+				'group_front_boxes'       => 0,
+				'group_front_description' => 0,
+				'group_nav_display'       => 0, // O is default (horizontally). 1 is vertically.
+				'group_nav_order'         => array(),
+				'group_nav_tabs'          => 0,
+				'group_subnav_tabs'       => 0,
+				'groups_create_tabs'      => 1,
+				'groups_layout'           => 1,
+				'members_group_layout'    => 1,
+				'groups_dir_layout'       => 0,
+				'groups_dir_tabs'         => 0,
+			)
+		);
 	}
 
 	if ( is_multisite() && bp_is_active( 'blogs' ) ) {
-		$default_args = array_merge( $default_args, array(
-			'sites_dir_layout' => 0,
-			'sites_dir_tabs'   => 0,
-		) );
+		$default_args = array_merge(
+			$default_args,
+			array(
+				'sites_dir_layout' => 0,
+				'sites_dir_tabs'   => 0,
+			)
+		);
 	}
 
 	$settings = bp_parse_args(
@@ -687,6 +696,15 @@ function bp_nouveau_get_appearance_settings( $option = '' ) {
 		$default_args,
 		'nouveau_appearance_settings'
 	);
+
+	// Override some settings to better suits block themes.
+	if ( bp_nouveau()->is_block_theme ) {
+		$settings['global_alignment'] = 'alignnone';
+
+		if ( isset( $settings['groups_create_tabs'] ) ) {
+			$settings['groups_create_tabs'] = 0;
+		}
+	}
 
 	if ( ! empty( $option ) ) {
 		if ( isset( $settings[ $option ] ) ) {
@@ -734,7 +752,10 @@ function bp_nouveau_customizer_grid_choices( $type = 'option' ) {
  * @return array An array of nav items slugs.
  */
 function bp_nouveau_sanitize_nav_order( $option = '' ) {
-	$option = explode( ',', $option );
+	if ( ! is_array( $option ) ) {
+		$option = explode( ',', $option );
+	}
+
 	return array_map( 'sanitize_key', $option );
 }
 
@@ -758,6 +779,10 @@ function bp_nouveau_theme_cover_image( $params = array() ) {
 	// Header content offset + spacing.
 	$top_offset  = bp_core_avatar_full_height() - 10;
 	$left_offset = bp_core_avatar_full_width() + 20;
+
+	if ( ! bp_is_active( 'activity' ) || ! bp_activity_do_mentions() ) {
+		$top_offset -= 40;
+	}
 
 	$cover_image = isset( $params['cover_image'] ) ? 'background-image: url( ' . $params['cover_image'] . ' );' : '';
 	$hide_avatar_style = '';
@@ -1122,7 +1147,9 @@ function bp_nouveau_get_user_feedback( $feedback_id = '' ) {
 	/*
 	 * Adjust some messages to the context.
 	 */
-	if ( 'completed-confirmation' === $feedback_id && bp_registration_needs_activation() ) {
+	if ( 'completed-confirmation' === $feedback_id && bp_get_membership_requests_required() ) {
+		$feedback_messages['completed-confirmation']['message'] = __( 'You have successfully submitted your membership request! Our site moderators will review your submission and send you an activation email if your request is approved.', 'buddypress' );
+	} elseif ( 'completed-confirmation' === $feedback_id && bp_registration_needs_activation() ) {
 		$feedback_messages['completed-confirmation']['message'] = __( 'You have successfully created your account! To begin using this site you will need to activate your account via the email we have just sent to your address.', 'buddypress' );
 	} elseif ( 'member-notifications-none' === $feedback_id ) {
 		$is_myprofile = bp_is_my_profile();
@@ -1403,7 +1430,7 @@ function bp_nouveau_get_submit_button( $action = '' ) {
  * @param array  $order       A list of slugs ordered (eg: array( 'profile', 'activity', etc..) )
  * @param string $parent_slug A parent slug if it's a secondary nav we are reordering (case of the Groups single item)
  *
- * @return bool True on success. False otherwise.
+ * @return bool False otherwise.
  */
 function bp_nouveau_set_nav_item_order( $nav = null, $order = array(), $parent_slug = '' ) {
 	if ( ! is_object( $nav ) || empty( $order ) || ! is_array( $order ) ) {
@@ -1494,35 +1521,15 @@ function bp_nouveau_get_component_slug( $component_id = '' ) {
  * Registers the 'bp/primary-nav' Widget Block.
  *
  * @since 9.0.0
+ * @since 12.0.0 Use the WP Blocks API v2.
  *
  * @param array $blocks The Core Blocks list.
  * @return array The Core Blocks list.
  */
 function bp_nouveau_register_primary_nav_widget_block( $blocks = array() ) {
-	$editor_style = bp_locate_template_asset( 'css/primary-nav.css' );
-
 	$blocks['bp/primary-nav'] = array(
-		'name'               => 'bp/primary-nav',
-		'editor_script'      => 'bp-primary-nav-block',
-		'editor_script_url'  => trailingslashit( buddypress()->plugin_url . 'bp-core' ) . 'js/blocks/primary-nav.js',
-		'editor_script_deps' => array(
-			'wp-blocks',
-			'wp-element',
-			'wp-components',
-			'wp-i18n',
-			'wp-block-editor',
-			'bp-block-data',
-			'bp-block-components',
-		),
-		'editor_style'       => 'bp-primary-nav-block',
-		'editor_style_url'   => $editor_style['uri'],
-		'attributes'         => array(
-			'displayTitle' => array(
-				'type'    => 'boolean',
-				'default' => true,
-			),
-		),
-		'render_callback'    => 'bp_nouveau_render_primary_nav_block',
+		'metadata'        => trailingslashit( buddypress()->plugin_dir ) . 'bp-core/blocks/primary-nav',
+		'render_callback' => 'bp_nouveau_render_primary_nav_block',
 	);
 
 	return $blocks;
@@ -1552,10 +1559,6 @@ add_filter( 'bp_core_block_globals', 'bp_nouveau_register_core_block_globals', 1
  * @since 9.0.0
  */
 function bp_nouveau_unregister_blocks_for_post_context() {
-	if ( ! function_exists( 'unregister_block_type' ) ) {
-		return;
-	}
-
 	$is_registered = WP_Block_Type_Registry::get_instance()->is_registered( 'bp/primary-nav' );
 
 	if ( $is_registered ) {
@@ -1642,4 +1645,94 @@ function bp_nouveau_render_primary_nav_block( $attributes = array() ) {
 	}
 
 	return $widget_content;
+}
+
+/**
+ * Retuns the theme layout available widths.
+ *
+ * @since 10.0.0
+ *
+ * @return array The available theme layout widths.
+ */
+function bp_nouveau_get_theme_layout_widths() {
+	$layout_widths = array();
+
+	if ( current_theme_supports( 'align-wide' ) ) {
+		$layout_widths = array(
+			'alignnone' => __( 'Default width', 'buddypress' ),
+			'alignwide' => __( 'Wide width', 'buddypress' ),
+			'alignfull' => __( 'Full width', 'buddypress' ),
+		);
+	}
+
+	// Use Block Theme global settings for Block Themes.
+	if ( wp_is_block_theme() ) {
+		$theme_layouts = wp_get_global_settings( array( 'layout' ) );
+
+		if ( isset( $theme_layouts['wideSize'] ) && $theme_layouts['wideSize'] ) {
+			$layout_widths = array(
+				'alignnone' => __( 'Content width', 'buddypress' ),
+				'alignwide' => __( 'Wide width', 'buddypress' ),
+			);
+		}
+	}
+
+	/**
+	 * Filter here to edit the available theme layout widths.
+	 *
+	 * @since 10.0.0
+	 *
+	 * @param array $layout_widths The available theme layout widths.
+	 */
+	return apply_filters( 'bp_nouveau_get_theme_layout_widths', $layout_widths );
+}
+
+/**
+ * Get the current displayed object for the priority nav.
+ *
+ * @since 12.0.0
+ *
+ * @return string The current displayed object (`member` or `group`).
+ */
+function bp_nouveau_get_current_priority_nav_object() {
+	$object = '';
+
+	if ( bp_is_user() ) {
+		$object = 'member';
+	} elseif ( bp_is_group() ) {
+		$object = 'group';
+	}
+
+	return $object;
+}
+
+/**
+ * Checks whether a single item supports priority nav.
+ *
+ * @since 12.0.0
+ *
+ * @param string $single_item The single item object name. Possible valuers are 'member' or 'group'.
+ * @return bool True if the single item supports priority nav. False otherwise.
+ */
+function bp_nouveau_single_item_supports_priority_nav( $single_item = '' ) {
+	$retval  = false;
+	$feature = bp_get_theme_compat_feature( 'priority_item_nav' );
+
+	if ( isset( $feature->single_items ) && is_array( $feature->single_items ) ) {
+		$retval = ! empty( $feature->single_items );
+
+		if ( $single_item ) {
+			$retval = in_array( $single_item, $feature->single_items, true );
+		}
+	}
+
+	/**
+	 * Use this filter to disallow/allow the Priority nav support.
+	 *
+	 * @since 12.0.0
+	 *
+	 * @param bool   $retval      True if the single item supports priority nav. False otherwise.
+	 * @param string $single_item The single item object name. Possible valuers are 'member' or 'group'.
+	 */
+	return apply_filters( 'bp_nouveau_single_item_supports_priority_nav', $retval, $single_item );
 }

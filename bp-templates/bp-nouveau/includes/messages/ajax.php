@@ -3,25 +3,86 @@
  * Messages Ajax functions
  *
  * @since 3.0.0
- * @version 8.0.0
+ * @version 12.0.0
  */
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
 
-add_action( 'admin_init', function() {
+add_action( 'admin_init', function () {
 	$ajax_actions = array(
-		array( 'messages_send_message'             => array( 'function' => 'bp_nouveau_ajax_messages_send_message', 'nopriv' => false ) ),
-		array( 'messages_send_reply'               => array( 'function' => 'bp_nouveau_ajax_messages_send_reply', 'nopriv' => false ) ),
-		array( 'messages_get_user_message_threads' => array( 'function' => 'bp_nouveau_ajax_get_user_message_threads', 'nopriv' => false ) ),
-		array( 'messages_thread_read'              => array( 'function' => 'bp_nouveau_ajax_messages_thread_read', 'nopriv' => false ) ),
-		array( 'messages_get_thread_messages'      => array( 'function' => 'bp_nouveau_ajax_get_thread_messages', 'nopriv' => false ) ),
-		array( 'messages_delete'                   => array( 'function' => 'bp_nouveau_ajax_delete_thread_messages', 'nopriv' => false ) ),
-		array( 'messages_unstar'                   => array( 'function' => 'bp_nouveau_ajax_star_thread_messages', 'nopriv' => false ) ),
-		array( 'messages_star'                     => array( 'function' => 'bp_nouveau_ajax_star_thread_messages', 'nopriv' => false ) ),
-		array( 'messages_unread'                   => array( 'function' => 'bp_nouveau_ajax_readunread_thread_messages', 'nopriv' => false ) ),
-		array( 'messages_read'                     => array( 'function' => 'bp_nouveau_ajax_readunread_thread_messages', 'nopriv' => false ) ),
-		array( 'messages_dismiss_sitewide_notice'  => array( 'function' => 'bp_nouveau_ajax_dismiss_sitewide_notice', 'nopriv' => false ) ),
+		array(
+			'messages_send_message' => array(
+				'function' => 'bp_nouveau_ajax_messages_send_message',
+				'nopriv'   => false,
+			),
+		),
+		array(
+			'messages_send_reply' => array(
+				'function' => 'bp_nouveau_ajax_messages_send_reply',
+				'nopriv'  => false,
+			),
+		),
+		array(
+			'messages_get_user_message_threads' => array(
+				'function' => 'bp_nouveau_ajax_get_user_message_threads',
+				'nopriv'   => false,
+			),
+		),
+		array(
+			'messages_thread_read' => array(
+				'function' => 'bp_nouveau_ajax_messages_thread_read',
+				'nopriv'   => false,
+			),
+		),
+		array(
+			'messages_get_thread_messages' => array(
+				'function' => 'bp_nouveau_ajax_get_thread_messages',
+				'nopriv'   => false,
+			),
+		),
+		array(
+			'messages_delete' => array(
+				'function' => 'bp_nouveau_ajax_delete_thread_messages',
+				'nopriv'   => false,
+			),
+		),
+		array(
+			'messages_exit' => array(
+				'function' => 'bp_nouveau_ajax_exit_thread_messages',
+				'nopriv'   => false,
+			),
+		),
+		array(
+			'messages_unstar' => array(
+				'function' => 'bp_nouveau_ajax_star_thread_messages',
+				'nopriv'   => false,
+			),
+		),
+		array(
+			'messages_star' => array(
+				'function' => 'bp_nouveau_ajax_star_thread_messages',
+				'nopriv'   => false,
+			),
+		),
+		array(
+			'messages_unread' => array(
+				'function' => 'bp_nouveau_ajax_readunread_thread_messages',
+				'nopriv'   => false,
+			),
+		),
+		array(
+			'messages_read' => array(
+				'function' => 'bp_nouveau_ajax_readunread_thread_messages',
+				'nopriv'   => false,
+			),
+		),
+		array(
+			'messages_dismiss_sitewide_notice'  => array(
+				'function' => 'bp_nouveau_ajax_dismiss_sitewide_notice',
+				'nopriv' => false,
+			),
+		),
 	);
 
 	foreach ( $ajax_actions as $ajax_action ) {
@@ -76,7 +137,7 @@ function bp_nouveau_ajax_messages_send_message() {
 	 * @param array $value Array of trimmed usernames.
 	 * @param array $value Array of un-trimmed usernames submitted.
 	 */
-	$recipients = apply_filters( 'bp_messages_recipients', array_map( function( $username ) {
+	$recipients = apply_filters( 'bp_messages_recipients', array_map( function ( $username ) {
 		return trim( $username, '@' );
 	}, $_POST['send_to'] ) );
 
@@ -275,8 +336,8 @@ function bp_nouveau_ajax_get_user_message_threads() {
 		$threads->threads[ $i ] = array(
 			'id'            => bp_get_message_thread_id(),
 			'message_id'    => (int) $last_message_id,
-			'subject'       => strip_tags( bp_get_message_thread_subject() ),
-			'excerpt'       => strip_tags( bp_get_message_thread_excerpt() ),
+			'subject'       => bp_get_message_thread_subject(),
+			'excerpt'       => bp_get_message_thread_excerpt(),
 			'content'       => do_shortcode( bp_get_message_thread_content() ),
 			'unread'        => bp_message_thread_has_unread(),
 			'sender_name'   => bp_core_get_user_displayname( $messages_template->thread->last_sender_id ),
@@ -306,7 +367,7 @@ function bp_nouveau_ajax_get_user_message_threads() {
 						'html'    => false,
 					) ) ),
 					'user_link' => bp_core_get_userlink( $recipient->user_id, false, true ),
-					'user_name' => bp_core_get_username( $recipient->user_id ),
+					'user_name' => bp_members_get_user_slug( $recipient->user_id ),
 				);
 			}
 		}
@@ -435,12 +496,13 @@ function bp_nouveau_ajax_get_thread_messages() {
 		wp_send_json_error( $response );
 	}
 
-	$thread = new stdClass;
+	$thread         = new stdClass;
+	$thread->thread = array();
 
 	if ( empty( $_POST['js_thread'] ) ) {
 		$thread->thread = array(
 			'id'      => bp_get_the_thread_id(),
-			'subject' => strip_tags( bp_get_the_thread_subject() ),
+			'subject' => wp_strip_all_tags( bp_get_the_thread_subject() ),
 		);
 
 		if ( is_array( $thread_template->thread->recipients ) ) {
@@ -455,7 +517,7 @@ function bp_nouveau_ajax_get_thread_messages() {
 						'html'    => false,
 					) ) ),
 					'user_link' => bp_core_get_userlink( $recipient->user_id, false, true ),
-					'user_name' => bp_core_get_username( $recipient->user_id ),
+					'user_name' => bp_members_get_user_slug( $recipient->user_id ),
 				);
 			}
 		}
@@ -779,4 +841,39 @@ function bp_nouveau_ajax_dismiss_sitewide_notice() {
 			'type'     => 'error',
 		) );
 	}
+}
+
+/**
+ * Ajax Handler of the exit action.
+ *
+ * @since 10.0.0
+ */
+function bp_nouveau_ajax_exit_thread_messages() {
+	$response = array(
+		'feedback' => __( 'There was a problem exiting the conversation. Please try again.', 'buddypress' ),
+		'type'     => 'error',
+	);
+
+	if ( empty( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'bp_nouveau_messages' ) ) {
+		wp_send_json_error( $response );
+	}
+
+	if ( empty( $_POST['id'] ) ) {
+		wp_send_json_error( $response );
+	}
+
+	$thread_ids = wp_parse_id_list( $_POST['id'] );
+
+	foreach ( $thread_ids as $thread_id ) {
+		if ( ! messages_check_thread_access( $thread_id ) && ! bp_current_user_can( 'bp_moderate' ) ) {
+			wp_send_json_error( $response );
+		}
+
+		bp_messages_exit_thread( $thread_id );
+	}
+
+	wp_send_json_success( array(
+		'feedback' => __( 'You have left the message thread.', 'buddypress' ),
+		'type'     => 'success',
+	) );
 }

@@ -1,6 +1,6 @@
 <?php
 /**
- * Settings: Capabilities action handler
+ * Settings: Capabilities action handler.
  *
  * @package BuddyPress
  * @subpackage SettingsActions
@@ -8,7 +8,7 @@
  */
 
 /**
- * Handles the setting of user capabilities, spamming, hamming, role, etc...
+ * Handles the setting of user capabilities, spamming, hamming, role, etc.
  *
  * @since 1.6.0
  */
@@ -51,7 +51,7 @@ function bp_settings_action_capabilities() {
 
 	/* Spam **************************************************************/
 
-	$is_spammer = !empty( $_POST['user-spammer'] ) ? true : false;
+	$is_spammer = ! empty( $_POST['user-spammer'] ) ? true : false;
 
 	if ( bp_is_user_spammer( bp_displayed_user_id() ) != $is_spammer ) {
 		$status = ( true == $is_spammer ) ? 'spam' : 'ham';
@@ -77,7 +77,10 @@ function bp_settings_action_capabilities() {
 	 */
 	do_action( 'bp_settings_capabilities_after_save' );
 
-	// Redirect to the root domain.
-	bp_core_redirect( bp_displayed_user_domain() . bp_get_settings_slug() . '/capabilities/' );
+	$path_chunks = bp_members_get_path_chunks( array( bp_get_settings_slug(), 'capabilities' ) );
+	$redirect    = bp_displayed_user_url( $path_chunks );
+
+	// Redirect to the settings capability page.
+	bp_core_redirect( $redirect );
 }
 add_action( 'bp_actions', 'bp_settings_action_capabilities' );

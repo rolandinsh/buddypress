@@ -8,9 +8,7 @@
  */
 
 // Exit if accessed directly.
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Adds specific script data for the BP Friends blocks.
@@ -26,7 +24,25 @@ function bp_friends_blocks_add_script_data() {
 		return;
 	}
 
-	// Include the common JS template.
+	$path = sprintf(
+		'/%1$s/%2$s/%3$s',
+		bp_rest_namespace(),
+		bp_rest_version(),
+		buddypress()->members->id
+	);
+
+	wp_localize_script(
+		'bp-friends-script',
+		'bpFriendsSettings',
+		array(
+			'path'  => ltrim( $path, '/' ),
+			'root'  => esc_url_raw( get_rest_url() ),
+			'nonce' => wp_create_nonce( 'wp_rest' ),
+		)
+	);
+
+	// Include the common JS template (Escaping is done there).
+	// phpcs:ignore WordPress.Security.EscapeOutput
 	echo bp_get_dynamic_template_part( 'assets/widgets/friends.php' );
 
 	// List the block specific props.
@@ -46,7 +62,7 @@ function bp_friends_blocks_add_script_data() {
  * @return string           HTML output.
  */
 function bp_friends_render_friends_block( $attributes = array() ) {
-	$block_args = wp_parse_args(
+	$block_args = bp_parse_args(
 		$attributes,
 		array(
 			'maxFriends'    => 5,
@@ -95,9 +111,12 @@ function bp_friends_render_friends_block( $attributes = array() ) {
 	// Make sure the widget ID is unique.
 	$widget_id = uniqid( 'friends-list-' );
 
-	$link = trailingslashit( bp_core_get_user_domain( $user_id ) . bp_get_friends_slug() );
+	$link = bp_members_get_user_url(
+		$user_id,
+		bp_members_get_path_chunks( array( bp_get_friends_slug() ) )
+	);
 
-	/* translators: %s is the member's display name */
+	/* translators: %s: member name */
 	$title = sprintf( __( '%s\'s Friends', 'buddypress' ), bp_core_get_user_displayname( $user_id ) );
 
 	// Set the Block's title.
@@ -114,15 +133,15 @@ function bp_friends_render_friends_block( $attributes = array() ) {
 	$item_options = array(
 		'newest'  => array(
 			'class' => '',
-			'label' => __( 'Newest', 'buddypress' ),
+			'label' => _x( 'Newest', 'Friends', 'buddypress' ),
 		),
 		'active'  => array(
 			'class' => '',
-			'label' => __( 'Active', 'buddypress' ),
+			'label' => _x( 'Active', 'Friends', 'buddypress' ),
 		),
 		'popular' => array(
 			'class' => '',
-			'label' => __( 'Popular', 'buddypress' ),
+			'label' => _x( 'Popular', 'Friends', 'buddypress' ),
 		),
 	);
 
@@ -166,7 +185,7 @@ function bp_friends_render_friends_block( $attributes = array() ) {
 					/* translators: %s: total friend count */
 					$extra = sprintf( _n( '%s friend', '%s friends', $user->total_friend_count, 'buddypress' ), number_format_i18n( $user->total_friend_count ) );
 				} else {
-					/* translators: %s: a human time diff. */
+					/* translators: %s: last activity timestamp (e.g. "Active 1 hour ago") */
 					$extra = sprintf( __( 'Active %s', 'buddypress' ), bp_core_time_since( $user->last_activity ) );
 				}
 
@@ -174,8 +193,8 @@ function bp_friends_render_friends_block( $attributes = array() ) {
 					'assets/widgets/friends.php',
 					'php',
 					array(
-						'data.link'              => bp_core_get_user_domain( $user->ID, $user->user_nicename, $user->user_login ),
-						'data.name'              => $user->display_name,
+						'data.link'              => esc_url( bp_members_get_user_url( $user->ID ) ),
+						'data.name'              => esc_html( $user->display_name ),
 						'data.avatar_urls.thumb' => bp_core_fetch_avatar(
 							array(
 								'item_id' => $user->ID,
@@ -186,16 +205,16 @@ function bp_friends_render_friends_block( $attributes = array() ) {
 							sprintf(
 								/* translators: %s: member name */
 								__( 'Profile picture of %s', 'buddypress' ),
-								$user->display_name
+								esc_html( $user->display_name )
 							)
 						),
 						'data.id'                => $user->ID,
-						'data.extra'             => $extra,
+						'data.extra'             => esc_html( $extra ),
 					)
 				);
 			}
 		}
-	} else {
+	} elseif ( defined( 'WP_USE_THEMES' ) ) {
 		// Get corresponding friends.
 		$path = sprintf(
 			'/%1$s/%2$s/%3$s',
@@ -209,10 +228,7 @@ function bp_friends_render_friends_block( $attributes = array() ) {
 			$path
 		);
 
-		$preloaded_friends = array();
-		if ( bp_is_running_wp( '5.0.0' ) ) {
-			$preloaded_friends = rest_preload_api_request( '', $default_path );
-		}
+		$preloaded_friends = rest_preload_api_request( '', $default_path );
 
 		buddypress()->friends->block_globals['bp/friends']->items[ $widget_id ] = (object) array(
 			'selector'   => $widget_id,
@@ -221,18 +237,9 @@ function bp_friends_render_friends_block( $attributes = array() ) {
 		);
 
 		// Only enqueue common/specific scripts and data once per page load.
-		if ( ! has_action( 'wp_footer', 'bp_friends_blocks_add_script_data', 1 ) ) {
+		if ( ! has_action( 'wp_footer', 'bp_friends_blocks_add_script_data' ) ) {
 			wp_set_script_translations( 'bp-friends-script', 'buddypress' );
 			wp_enqueue_script( 'bp-friends-script' );
-			wp_localize_script(
-				'bp-friends-script',
-				'bpFriendsSettings',
-				array(
-					'path'  => ltrim( $path, '/' ),
-					'root'  => esc_url_raw( get_rest_url() ),
-					'nonce' => wp_create_nonce( 'wp_rest' ),
-				)
-			);
 
 			add_action( 'wp_footer', 'bp_friends_blocks_add_script_data', 1 );
 		}

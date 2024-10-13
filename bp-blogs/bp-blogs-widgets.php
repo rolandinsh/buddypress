@@ -5,19 +5,10 @@
  * @package BuddyPress
  * @subpackage BlogsWidgets
  * @since 1.0.0
+ * @deprecated 12.0.0
  */
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
 
-/**
- * Register the widgets for the Blogs component.
- */
-function bp_blogs_register_widgets() {
-	global $wpdb;
-
-	if ( bp_is_active( 'activity' ) && bp_is_root_blog( $wpdb->blogid ) ) {
-		add_action( 'widgets_init', function() { register_widget( 'BP_Blogs_Recent_Posts_Widget' ); } );
-	}
-}
-add_action( 'bp_register_widgets', 'bp_blogs_register_widgets' );
+_deprecated_file( basename( __FILE__ ), '12.0.0', '', esc_html__( 'BuddyPress does not include Legacy Widgets anymore, you can restore it using the BP Classic plugin', 'buddypress' ) );

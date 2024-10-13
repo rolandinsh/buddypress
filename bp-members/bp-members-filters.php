@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Escape commonly used fullname output functions.
  */
-add_filter( 'bp_displayed_user_fullname',    'esc_html' );
+add_filter( 'bp_displayed_user_fullname', 'esc_html' );
 add_filter( 'bp_get_loggedin_user_fullname', 'esc_html' );
 
 // Filter the user registration URL to point to BuddyPress's registration page.
@@ -45,7 +45,7 @@ function bp_members_signup_sanitization() {
 	);
 
 	// Add the filters to each field.
-	foreach( $fields as $filter ) {
+	foreach ( $fields as $filter ) {
 		add_filter( $filter, 'esc_html',       1 );
 		add_filter( $filter, 'wp_filter_kses', 2 );
 		add_filter( $filter, 'stripslashes',   3 );
@@ -108,7 +108,10 @@ function bp_members_edit_profile_url( $url, $user_id, $scheme = 'admin' ) {
 
 	// If xprofile is active, use profile domain link.
 	if ( ! is_admin() && bp_is_active( 'xprofile' ) ) {
-		$profile_link = trailingslashit( bp_core_get_user_domain( $user_id ) . bp_get_profile_slug() . '/edit' );
+		$profile_link = bp_members_get_user_url(
+			$user_id,
+			bp_members_get_path_chunks( array( bp_get_profile_slug(), 'edit' ) )
+		);
 
 	} else {
 		// Default to $url.
@@ -134,7 +137,7 @@ add_filter( 'edit_profile_url', 'bp_members_edit_profile_url', 10, 3 );
  * @since 8.0.0
  *
  * @param bool   $retval     Whether or not the current user has the capability.
- * @param int    $user_id
+ * @param int    $user_id    User ID.
  * @param string $capability The capability being checked for.
  * @param int    $site_id    Site ID. Defaults to the BP root blog.
  * @param array  $args       Array of extra arguments passed.
@@ -232,7 +235,7 @@ function bp_members_invitations_get_registration_welcome_message() {
 			esc_html__( 'Welcome! You are already a member of this site. Please %s to continue.', 'buddypress' ),
 			sprintf(
 				'<a href="%1$s">%2$s</a>',
-				esc_url( wp_login_url( bp_get_root_domain() ) ),
+				esc_url( wp_login_url( bp_get_root_url() ) ),
 				esc_html__( 'log in', 'buddypress' )
 			)
 		);
@@ -304,12 +307,12 @@ function bp_members_invitations_get_modified_registration_disabled_message() {
 				esc_html__( 'Welcome! You are already a member of this site. Please %1$s to continue. If you have forgotten your password, you can %2$s.', 'buddypress' ),
 				sprintf(
 					'<a href="%1$s">%2$s</a>',
-					esc_url( wp_login_url( bp_get_root_domain() ) ),
+					esc_url( wp_login_url( bp_get_root_url() ) ),
 					esc_html__( 'log in', 'buddypress' )
 				),
 				sprintf(
 					'<a href="%1$s">%2$s</a>',
-					esc_url( wp_lostpassword_url( bp_get_root_domain() ) ),
+					esc_url( wp_lostpassword_url( bp_get_root_url() ) ),
 					esc_html__( 'reset it', 'buddypress' )
 				)
 			);
@@ -326,7 +329,7 @@ function bp_members_invitations_get_modified_registration_disabled_message() {
  *
  * @param int|string $value    The value for the requested property.
  * @param string     $property The name of the requested property.
- * @param string     $context  The context of display.
+ * @param string     $context  Optional. The context of display.
  * @return int|string          The sanitized value.
  */
 function bp_members_sanitize_invitation_property( $value = '', $property = '', $context = 'html' ) {

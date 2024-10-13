@@ -49,12 +49,16 @@ add_action( 'bp_register_activity_actions', 'xprofile_register_activity_actions'
  * @return string
  */
 function bp_xprofile_format_activity_action_updated_profile( $action, $activity ) {
-
-	// Note for translators: The natural phrasing in English, "Joe updated
-	// his profile", requires that we know Joe's gender, which we don't. If
-	// your language doesn't have this restriction, feel free to use a more
-	// natural translation.
-	$profile_link = trailingslashit( bp_core_get_user_domain( $activity->user_id ) . bp_get_profile_slug() );
+	/*
+	 * Note for translators: The natural phrasing in English, "Joe updated
+	 * his profile", requires that we know Joe's gender, which we don't. If
+	 * your language doesn't have this restriction, feel free to use a more
+	 * natural translation.
+	 */
+	$profile_link = bp_members_get_user_url(
+		$activity->user_id,
+		bp_members_get_path_chunks( array( bp_get_profile_slug() ) )
+	);
 
 	/* translators: %s: user profile link */
 	$action = sprintf( esc_html__( "%s's profile was updated", 'buddypress' ), '<a href="' . esc_url( $profile_link ) . '">' . bp_core_get_user_displayname( $activity->user_id ) . '</a>' );
@@ -87,18 +91,21 @@ function xprofile_record_activity( $args = '' ) {
 	}
 
 	// Parse the arguments.
-	$r = bp_parse_args( $args, array(
-		'user_id'           => bp_loggedin_user_id(),
-		'action'            => '',
-		'content'           => '',
-		'primary_link'      => '',
-		'component'         => buddypress()->profile->id,
-		'type'              => false,
-		'item_id'           => false,
-		'secondary_item_id' => false,
-		'recorded_time'     => bp_core_current_time(),
-		'hide_sitewide'     => false
-	) );
+	$r = bp_parse_args(
+		$args,
+		array(
+			'user_id'           => bp_loggedin_user_id(),
+			'action'            => '',
+			'content'           => '',
+			'primary_link'      => '',
+			'component'         => buddypress()->profile->id,
+			'type'              => false,
+			'item_id'           => false,
+			'secondary_item_id' => false,
+			'recorded_time'     => bp_core_current_time(),
+			'hide_sitewide'     => false,
+		)
+	);
 
 	return bp_activity_add( $r );
 }
@@ -122,9 +129,13 @@ function xprofile_delete_activity( $args = '' ) {
 	}
 
 	// Parse the arguments.
-	$r = bp_parse_args( $args, array(
-		'component' => buddypress()->profile->id
-	), 'xprofile_delete_activity' );
+	$r = bp_parse_args(
+		$args,
+		array(
+			'component' => buddypress()->profile->id,
+		),
+		'xprofile_delete_activity'
+	);
 
 	// Delete the activity item.
 	bp_activity_delete_by_item_id( $r );
@@ -137,7 +148,7 @@ function xprofile_delete_activity( $args = '' ) {
  *
  * @param string $key Key.
  * @param string $value Value.
- * @return bool True if success, false on failure.
+ * @return bool
  */
 function xprofile_register_activity_action( $key, $value ) {
 
@@ -168,7 +179,7 @@ function xprofile_register_activity_action( $key, $value ) {
  * @param bool  $errors     True if validation or saving errors occurred, otherwise false.
  * @param array $old_values Pre-save xprofile field values and visibility levels.
  * @param array $new_values Post-save xprofile field values and visibility levels.
- * @return bool True on success, false on failure.
+ * @return bool
  */
 function bp_xprofile_updated_profile_activity( $user_id, $field_ids = array(), $errors = false, $old_values = array(), $new_values = array() ) {
 
@@ -239,7 +250,10 @@ function bp_xprofile_updated_profile_activity( $user_id, $field_ids = array(), $
 	}
 
 	// If we've reached this point, assemble and post the activity item.
-	$profile_link = trailingslashit( bp_core_get_user_domain( $user_id ) . bp_get_profile_slug() );
+	$profile_link = bp_members_get_user_url(
+		$user_id,
+		bp_members_get_path_chunks( array( bp_get_profile_slug() ) )
+	);
 
 	return (bool) xprofile_record_activity( array(
 		'user_id'      => $user_id,
@@ -259,7 +273,7 @@ add_action( 'xprofile_updated_profile', 'bp_xprofile_updated_profile_activity', 
 function xprofile_activity_filter_options() {
 	?>
 
-	<option value="updated_profile"><?php _e( 'Profile Updates', 'buddypress' ) ?></option>
+	<option value="updated_profile"><?php esc_html_e( 'Profile Updates', 'buddypress' ) ?></option>
 
 	<?php
 }

@@ -27,7 +27,10 @@ function members_screen_send_invites() {
 			'send_invite'   => 1,
 		);
 
-		$invite_args = wp_parse_args( array_map( 'wp_unslash', $_REQUEST ), $default_args );
+		$invite_args = bp_parse_args(
+			array_map( 'wp_unslash', $_REQUEST ),
+			$default_args
+		);
 		$invite_args = array_intersect_key( $invite_args, $default_args );
 
 		// Check the nonce and delete the invitation.
@@ -48,14 +51,19 @@ function members_screen_send_invites() {
 	 */
 	do_action( 'members_screen_send_invites' );
 
-	/**
-	 * Filters the template used to display the send membership invitations page.
-	 *
-	 * @since 8.0.0
-	 *
-	 * @param string $template Path to the send membership invitations template to load.
-	 */
-	bp_core_load_template( apply_filters( 'members_template_send_invites', 'members/single/invitations' ) );
+	$templates = array(
+		/**
+		 * Filters the template used to display the send membership invitations page.
+		 *
+		 * @since 8.0.0
+		 *
+		 * @param string $template Path to the send membership invitations template to load.
+		 */
+		apply_filters( 'members_template_send_invites', 'members/single/home' ),
+		'members/single/index',
+	);
+
+	bp_core_load_template( $templates );
 }
 
 /**
@@ -109,12 +117,17 @@ function members_screen_list_sent_invites() {
 	 */
 	do_action( 'members_screen_list_sent_invites' );
 
-	/**
-	 * Filters the template used to display the send membership invitations page.
-	 *
-	 * @since 8.0.0
-	 *
-	 * @param string $template Path to the send membership invitations template to load.
-	 */
-	bp_core_load_template( apply_filters( 'members_template_list_sent_invites', 'members/single/invitations' ) );
+	$templates = array(
+		/**
+		 * Filters the template used to display the send membership invitations page.
+		 *
+		 * @since 8.0.0
+		 *
+		 * @param string $template Path to the send membership invitations template to load.
+		 */
+		apply_filters( 'members_template_list_sent_invites', 'members/single/home' ),
+		'members/single/index',
+	);
+
+	bp_core_load_template( $templates );
 }

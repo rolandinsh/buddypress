@@ -60,9 +60,17 @@ class BP_Groups_Membership_Requests_Template {
 
 	/**
 	 * @since 1.0.0
-	 * @var array|string|void
+	 * @var array|string|null
 	 */
 	public $pag_links;
+
+	/**
+	 * URL argument used for the pagination param.
+	 *
+	 * @since 1.0.0
+	 * @var string
+	 */
+	public $pag_arg;
 
 	/**
 	 * @since 1.0.0
@@ -90,7 +98,7 @@ class BP_Groups_Membership_Requests_Template {
 		// Backward compatibility with old method of passing arguments.
 		if ( ! is_array( $args ) || count( $function_args ) > 1 ) {
 			/* translators: 1: the name of the method. 2: the name of the file. */
-			_deprecated_argument( __METHOD__, '2.0.0', sprintf( __( 'Arguments passed to %1$s should be in an associative array. See the inline documentation at %2$s for more details.', 'buddypress' ), __METHOD__, __FILE__ ) );
+			_deprecated_argument( __METHOD__, '2.0.0', sprintf( esc_html__( 'Arguments passed to %1$s should be in an associative array. See the inline documentation at %2$s for more details.', 'buddypress' ), __METHOD__, __FILE__ ) );
 
 			$old_args_keys = array(
 				0 => 'group_id',
@@ -101,14 +109,18 @@ class BP_Groups_Membership_Requests_Template {
 			$args = bp_core_parse_args_array( $old_args_keys, $function_args );
 		}
 
-		$r = bp_parse_args( $args, array(
-			'page'     => 1,
-			'per_page' => 10,
-			'page_arg' => 'mrpage',
-			'max'      => false,
-			'type'     => 'first_joined',
-			'group_id' => bp_get_current_group_id(),
-		), 'groups_membership_requests_template' );
+		$r = bp_parse_args(
+			$args,
+			array(
+				'page'     => 1,
+				'per_page' => 10,
+				'page_arg' => 'mrpage',
+				'max'      => false,
+				'type'     => 'first_joined',
+				'group_id' => bp_get_current_group_id(),
+			),
+			'groups_membership_requests_template'
+		);
 
 		$this->pag_arg  = sanitize_key( $r['page_arg'] );
 		$this->pag_page = bp_sanitize_pagination_arg( $this->pag_arg, $r['page']     );

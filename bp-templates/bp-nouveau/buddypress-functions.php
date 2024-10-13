@@ -3,7 +3,8 @@
  * Functions of BuddyPress's "Nouveau" template pack.
  *
  * @since 3.0.0
- * @version 3.1.0
+ * @package BuddyPress
+ * @version 12.0.0
  *
  * @buddypress-template-pack {
  *   Template Pack ID:       nouveau
@@ -32,8 +33,11 @@ defined( 'ABSPATH' ) || exit;
  * @since 3.0.0
  */
 class BP_Nouveau extends BP_Theme_Compat {
+
 	/**
 	 * Instance of this class.
+	 *
+	 * @var BP_Nouveau|null
 	 */
 	protected static $instance = null;
 
@@ -41,6 +45,8 @@ class BP_Nouveau extends BP_Theme_Compat {
 	 * Return the instance of this class.
 	 *
 	 * @since 3.0.0
+	 *
+	 * @return BP_Nouveau
 	 */
 	public static function get_instance() {
 		if ( null === self::$instance ) {
@@ -74,8 +80,10 @@ class BP_Nouveau extends BP_Theme_Compat {
 			$this->{$property} = $value;
 		}
 
-		$this->includes_dir  = trailingslashit( $this->dir ) . 'includes/';
-		$this->directory_nav = new BP_Core_Nav();
+		$this->includes_dir   = trailingslashit( $this->dir ) . 'includes/';
+		$this->directory_nav  = new BP_Core_Nav( bp_get_root_blog_id() );
+		$this->is_block_theme = false;
+		$this->is_block_theme = wp_is_block_theme();
 	}
 
 	/**
@@ -94,18 +102,33 @@ class BP_Nouveau extends BP_Theme_Compat {
 
 		// Load AJAX code only on AJAX requests.
 		} else {
-			add_action( 'admin_init', function() {
+			add_action( 'admin_init', function () {
 				if ( defined( 'DOING_AJAX' ) && true === DOING_AJAX ) {
 					require bp_nouveau()->includes_dir . 'ajax.php';
 				}
 			}, 0 );
 		}
 
-		add_action( 'bp_customize_register', function() {
-			if ( bp_is_root_blog() && current_user_can( 'customize' ) ) {
-				require bp_nouveau()->includes_dir . 'customizer.php';
+		// The customizer is only used by classic themes.
+		if ( ! $this->is_block_theme ) {
+			add_action(
+				'bp_customize_register',
+				function() {
+					if ( bp_is_root_blog() && current_user_can( 'customize' ) ) {
+						require bp_nouveau()->includes_dir . 'customizer.php';
+					}
+				},
+				0
+			);
+
+			// When BP Classic is activated, regular themes need this filter. 
+			if ( function_exists( 'bp_classic' ) ) {
+				// Set the BP Uri for the Ajax customizer preview.
+				add_filter( 'bp_uri', array( $this, 'customizer_set_uri' ), 10, 1 );
 			}
-		}, 0 );
+		} elseif ( wp_using_themes() && ! isset( $_GET['bp_customizer'] ) ) {
+			remove_action( 'customize_register', 'bp_customize_register', 20 );
+		}
 
 		foreach ( bp_core_get_packaged_component_ids() as $component ) {
 			$component_loader = trailingslashit( $this->includes_dir ) . $component . '/loader.php';
@@ -122,7 +145,7 @@ class BP_Nouveau extends BP_Theme_Compat {
 		 *
 		 * @since 3.0.0
 		 *
-		 * @param BP_Nouveau $value Current BP_Nouveau instance.
+		 * @param BP_Nouveau $template_pack Current Template Pack instance.
 		 */
 		do_action_ref_array( 'bp_nouveau_includes', array( &$this ) );
 	}
@@ -133,8 +156,8 @@ class BP_Nouveau extends BP_Theme_Compat {
 	 * @since 3.0.0
 	 */
 	protected function setup_support() {
-		$width         = 1300;
-		$top_offset    = 150;
+		$width      = 1300;
+		$top_offset = 150;
 
 		/** This filter is documented in bp-core/bp-core-avatars.php. */
 		$avatar_height = apply_filters( 'bp_core_avatar_full_height', $top_offset );
@@ -143,16 +166,33 @@ class BP_Nouveau extends BP_Theme_Compat {
 			$top_offset = $avatar_height;
 		}
 
-		bp_set_theme_compat_feature( $this->id, array(
-			'name'     => 'cover_image',
-			'settings' => array(
-				'components'   => array( 'members', 'groups' ),
-				'width'        => $width,
-				'height'       => $top_offset + round( $avatar_height / 2 ),
-				'callback'     => 'bp_nouveau_theme_cover_image',
-				'theme_handle' => 'bp-nouveau',
-			),
-		) );
+		if ( $this->is_block_theme ) {
+			$width = (int) wp_get_global_settings( array( 'layout', 'contentSize' ) );
+		}
+
+		bp_set_theme_compat_feature(
+			$this->id,
+			array(
+				'name'     => 'cover_image',
+				'settings' => array(
+					'components'   => array( 'members', 'groups' ),
+					'width'        => $width,
+					'height'       => $top_offset + round( $avatar_height / 2 ),
+					'callback'     => 'bp_nouveau_theme_cover_image',
+					'theme_handle' => 'bp-nouveau',
+				),
+			)
+		);
+
+		bp_set_theme_compat_feature(
+			$this->id,
+			array(
+				'name'     => 'priority_item_nav',
+				'settings' => array(
+					'single_items' => $this->is_block_theme ? array( 'member', 'group' ) : array(),
+				),
+			)
+		);
 	}
 
 	/**
@@ -170,15 +210,24 @@ class BP_Nouveau extends BP_Theme_Compat {
 		// We need to neutralize the BuddyPress core "bp_core_render_message()" once it has been added.
 		add_action( 'bp_actions', array( $this, 'neutralize_core_template_notices' ), 6 );
 
-		// Scripts.
-		add_action( 'bp_enqueue_scripts', array( $this, 'register_scripts' ), 2 ); // Register theme JS.
-		remove_action( 'bp_enqueue_scripts', 'bp_core_confirmation_js' );
-		add_action( 'bp_enqueue_scripts', array( $this, 'enqueue_styles' ) ); // Enqueue theme CSS.
-		add_action( 'bp_enqueue_scripts', array( $this, 'enqueue_scripts' ) ); // Enqueue theme JS.
-		add_filter( 'bp_enqueue_scripts', array( $this, 'localize_scripts' ) ); // Enqueue theme script localization.
+		// Register scripts & styles.
+		add_action( 'bp_enqueue_community_scripts', array( $this, 'register_scripts' ), 2 );
 
-		// Body no-js class.
-		add_filter( 'body_class', array( $this, 'add_nojs_body_class' ), 20, 1 );
+		// Enqueue theme CSS.
+		add_action( 'bp_enqueue_community_scripts', array( $this, 'enqueue_styles' ) );
+
+		// Enqueue theme JS.
+		add_action( 'bp_enqueue_community_scripts', array( $this, 'enqueue_scripts' ) );
+
+		// Enqueue theme script localization.
+		add_action( 'bp_enqueue_community_scripts', array( $this, 'localize_scripts' ) );
+		remove_action( 'bp_enqueue_community_scripts', 'bp_core_confirmation_js' );
+
+		/** This filter is documented in bp-core/bp-core-dependency.php */
+		if ( is_buddypress() || ! apply_filters( 'bp_enqueue_assets_in_bp_pages_only', true ) ) {
+			// Body no-js class.
+			add_filter( 'body_class', array( $this, 'add_nojs_body_class' ), 20, 1 );
+		}
 
 		// Ajax querystring.
 		add_filter( 'bp_ajax_querystring', 'bp_nouveau_ajax_querystring', 10, 2 );
@@ -188,12 +237,6 @@ class BP_Nouveau extends BP_Theme_Compat {
 
 		// Register the Default front pages Dynamic Sidebars.
 		add_action( 'widgets_init', 'bp_nouveau_register_sidebars', 11 );
-
-		// Register the Primary Object nav widget.
-		add_action( 'bp_widgets_init', array( 'BP_Nouveau_Object_Nav_Widget', 'register_widget' ) );
-
-		// Set the BP Uri for the Ajax customizer preview.
-		add_filter( 'bp_uri', array( $this, 'customizer_set_uri' ), 10, 1 );
 
 		// Modify "registration disabled" and welcome message if invitations are enabled.
 		add_action( 'bp_nouveau_feedback_messages', array( $this, 'filter_registration_messages' ), 99 );
@@ -205,7 +248,7 @@ class BP_Nouveau extends BP_Theme_Compat {
 		 *
 		 * @since 3.0.0
 		 *
-		 * @param BP_Nouveau $this Current BP_Nouveau instance.
+		 * @param BP_Nouveau $template_pack Current Template Pack instance.
 		 */
 		do_action_ref_array( 'bp_theme_compat_actions', array( &$this ) );
 	}
@@ -230,7 +273,7 @@ class BP_Nouveau extends BP_Theme_Compat {
 		 *
 		 * @param array $value Array of style dependencies. Default Dashicons.
 		 */
-		$css_dependencies = apply_filters( 'bp_nouveau_css_dependencies', array( 'dashicons' ) );
+		$css_dependencies = apply_filters( 'bp_nouveau_css_dependencies', array( 'dashicons', 'bp-tooltips' ) );
 
 		/**
 		 * Filters the styles to enqueue for BuddyPress Nouveau.
@@ -246,6 +289,9 @@ class BP_Nouveau extends BP_Theme_Compat {
 		$styles = apply_filters( 'bp_nouveau_enqueue_styles', array(
 			'bp-nouveau' => array(
 				'file' => 'css/buddypress%1$s%2$s.css', 'dependencies' => $css_dependencies, 'version' => $this->version,
+			),
+			'bp-nouveau-priority-nav' => array(
+				'file' => 'css/priority-nav%1$s%2$s.css', 'dependencies' => array( 'dashicons' ), 'version' => $this->version,
 			),
 		) );
 
@@ -338,34 +384,27 @@ class BP_Nouveau extends BP_Theme_Compat {
 		 *
 		 * @param array $value Array of scripts to register.
 		 */
-		$scripts = apply_filters( 'bp_nouveau_register_scripts', array(
-			'bp-nouveau' => array(
-				'file'         => 'js/buddypress-nouveau%s.js',
-				'dependencies' => $dependencies,
-				'version'      => $this->version,
-				'footer'       => true,
-			),
-		) );
+		$scripts = apply_filters(
+			'bp_nouveau_register_scripts',
+			array(
+				'bp-nouveau' => array(
+					'file'         => 'js/buddypress-nouveau%s.js',
+					'dependencies' => $dependencies,
+					'version'      => $this->version,
+					'footer'       => true,
+				),
+				'bp-nouveau-priority-menu' => array(
+					'file'         => 'js/buddypress-priority-menu%s.js',
+					'dependencies' => array(),
+					'version'      => $this->version,
+					'footer'       => true,
+				)
+			)
+		);
 
 		// Bail if no scripts.
 		if ( empty( $scripts ) ) {
 			return;
-		}
-
-		// Add The password verify if needed.
-		if ( bp_is_active( 'settings' ) || bp_get_signup_allowed() ) {
-			/**
-			 * BP Nouveau is now directly using the `wp-admin/js/user-profile.js` script.
-			 *
-			 * Setting the user password is now more consistent with how WordPress handles it.
-			 *
-			 * @deprecated 5.0.0
-			 */
-			$scripts['bp-nouveau-password-verify'] = array(
-				'file'         => 'js/password-verify%s.js',
-				'dependencies' => array( 'bp-nouveau', 'password-strength-meter' ),
-				'footer'       => true,
-			);
 		}
 
 		foreach ( $scripts as $handle => $script ) {
@@ -498,6 +537,14 @@ class BP_Nouveau extends BP_Theme_Compat {
 		// Used to transport the settings inside the Ajax requests.
 		if ( is_customize_preview() ) {
 			$params['customizer_settings'] = bp_nouveau_get_temporary_setting( 'any' );
+		}
+
+		$required_password_strength = bp_members_user_pass_required_strength();
+		if ( $required_password_strength ) {
+			$params['bpPasswordVerify'] = array(
+				'tooWeakPasswordWarning' => __( 'Your password is too weak, please use a stronger password.', 'buddypress' ),
+				'requiredPassStrength'   => bp_members_user_pass_required_strength(),
+			);
 		}
 
 		/**
@@ -652,33 +699,36 @@ class BP_Nouveau extends BP_Theme_Compat {
 	 * Set the BP Uri for the customizer in case of Ajax requests.
 	 *
 	 * @since 3.0.0
+	 * @since 12.0.0 Only fired for regular themes when BP Classic is activated.
 	 *
-	 * @param  string $path the BP Uri.
-	 * @return string       the BP Uri.
+	 * @param  string $path The BP Uri.
+	 * @return string
 	 */
 	public function customizer_set_uri( $path ) {
+
 		if ( ! defined( 'DOING_AJAX' ) || ! DOING_AJAX ) {
 			return $path;
 		}
 
-		$uri = parse_url( $path );
+		$uri = wp_parse_url( $path );
 
-		if ( false === strpos( $uri['path'], 'customize.php' ) ) {
+		if ( ! str_contains( $uri['path'], 'customize.php' ) || empty( $uri['query'] ) ) {
 			return $path;
-		} else {
-			$vars = bp_parse_args(
-				$uri['query'],
-				array(),
-				'customizer_set_uri'
-			);
+		}
 
-			if ( ! empty( $vars['url'] ) ) {
-				$path = str_replace( get_site_url(), '', urldecode( $vars['url'] ) );
-			}
+		$vars = bp_parse_args(
+			$uri['query'],
+			array(),
+			'customizer_set_uri'
+		);
+
+		if ( ! empty( $vars['url'] ) ) {
+			$path = str_replace( get_site_url(), '', urldecode( $vars['url'] ) );
 		}
 
 		return $path;
 	}
+
 	/**
 	 * Modify "registration disabled" message in Nouveau template pack.
 	 * Modify welcome message in Nouveau template pack.
@@ -689,7 +739,7 @@ class BP_Nouveau extends BP_Theme_Compat {
 	 *
 	 * @return array $messages
 	 */
-	function filter_registration_messages( $messages ) {
+	public function filter_registration_messages( $messages ) {
 		// Change the "registration is disabled" message.
 		$disallowed_message = bp_members_invitations_get_modified_registration_disabled_message();
 		if ( $disallowed_message ) {

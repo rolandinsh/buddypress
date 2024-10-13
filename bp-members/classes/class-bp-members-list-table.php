@@ -27,6 +27,15 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 	public $signup_counts = 0;
 
 	/**
+	 * Signup profile fields.
+	 *
+	 * @since 10.0.0
+	 *
+	 * @var array
+	 */
+	public $signup_field_labels = array();
+
+	/**
 	 * Constructor.
 	 *
 	 * @since 2.0.0
@@ -48,6 +57,8 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 	 * manipulation required prior to rendering.
 	 *
 	 * @since 2.0.0
+	 *
+	 * @global string $usersearch The users search terms.
 	 */
 	public function prepare_items() {
 		global $usersearch;
@@ -88,7 +99,7 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 	 *
 	 * @since 2.5.0
 	 *
-	 * @global string $role The name of role the users screens is filtered by
+	 * @global string $role The name of role the users screens is filtered by.
 	 */
 	public function views() {
 		global $role;
@@ -138,14 +149,7 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 	 */
 	public function get_columns() {
 
-		/**
-		 * Filters the single site Members signup columns.
-		 *
-		 * @since 2.0.0
-		 *
-		 * @param array $value Array of columns to display.
-		 */
-		return apply_filters( 'bp_members_signup_columns', array(
+		$columns = array(
 			'cb'         => '<input type="checkbox" />',
 			'username'   => __( 'Username',    'buddypress' ),
 			'name'       => __( 'Name',        'buddypress' ),
@@ -153,7 +157,16 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 			'registered' => __( 'Registered',  'buddypress' ),
 			'date_sent'  => __( 'Last Sent',   'buddypress' ),
 			'count_sent' => __( 'Emails Sent', 'buddypress' )
-		) );
+		);
+
+		/**
+		 * Filters the single site Members signup columns.
+		 *
+		 * @since 2.0.0
+		 *
+		 * @param array $value Array of columns to display.
+		 */
+		return apply_filters( 'bp_members_signup_columns', $columns );
 	}
 
 	/**
@@ -171,7 +184,14 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 			$actions['delete'] = __( 'Delete', 'buddypress' );
 		}
 
-		return $actions;
+		/**
+		 * Filters the bulk actions for signups.
+		 *
+		 * @since 10.0.0
+		 *
+		 * @param array $actions Array of actions and corresponding labels.
+		 */
+		return apply_filters( 'bp_members_ms_signup_bulk_actions', $actions );
 	}
 
 	/**
@@ -183,7 +203,7 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 	 */
 	public function no_items() {
 
-		if ( bp_get_signup_allowed() ) {
+		if ( bp_get_signup_allowed() || bp_get_membership_requests_required() ) {
 			esc_html_e( 'No pending accounts found.', 'buddypress' );
 		} else {
 			$link = false;
@@ -195,8 +215,13 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 				$link = sprintf( '<a href="%1$s">%2$s</a>', esc_url( bp_get_admin_url( 'options-general.php' ) ), esc_html__( 'Edit settings', 'buddypress' ) );
 			}
 
-			/* translators: %s: url to site settings */
-			printf( __( 'Registration is disabled. %s', 'buddypress' ), $link );
+			printf(
+				/* translators: %s: url to site settings */
+				esc_html__( 'Registration is disabled. %s', 'buddypress' ),
+				// The link has been escaped at line 213 & 215.
+				// phpcs:ignore WordPress.Security.EscapeOutput
+				$link
+			);
 		}
 
 	}
@@ -228,7 +253,10 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 				$signup_object->ID = $signup_object->id;
 			}
 
-			$style = ( ' class="alternate"' == $style ) ? '' : ' class="alternate"';
+			$style = 'alt' === $style ? '' : 'alt';
+
+			// Escapes are made into `self::single_row()`.
+			// phpcs:ignore WordPress.Security.EscapeOutput
 			echo "\n\t" . $this->single_row( $signup_object, $style );
 		}
 	}
@@ -244,10 +272,16 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 	 * @param string      $style         Styles for the row.
 	 * @param string      $role          Role to be assigned to user.
 	 * @param int         $numposts      Numper of posts.
-	 * @return void
 	 */
 	public function single_row( $signup_object = null, $style = '', $role = '', $numposts = 0 ) {
-		echo '<tr' . $style . ' id="signup-' . esc_attr( $signup_object->id ) . '">';
+		if ( '' === $style ) {
+			echo '<tr id="signup-' . esc_attr( $signup_object->id ) . '">';
+		} else {
+			echo '<tr class="alternate" id="signup-' . esc_attr( $signup_object->id ) . '">';
+		}
+
+		// BuddyPress relies on WordPress's `WP_Users_List_Table::single_row_columns()`.
+		// phpcs:ignore WordPress.Security.EscapeOutput
 		echo $this->single_row_columns( $signup_object );
 		echo '</tr>';
 	}
@@ -261,10 +295,15 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 	 */
 	public function column_cb( $signup_object = null ) {
 	?>
-		<label class="screen-reader-text" for="signup_<?php echo intval( $signup_object->id ); ?>"><?php
-			/* translators: accessibility text */
-			printf( esc_html__( 'Select user: %s', 'buddypress' ), $signup_object->user_login );
-		?></label>
+		<label class="screen-reader-text" for="signup_<?php echo intval( $signup_object->id ); ?>">
+			<?php
+			printf(
+				/* translators: accessibility text */
+				esc_html__( 'Select user: %s', 'buddypress' ),
+				esc_html( $signup_object->user_login )
+			);
+			?>
+		</label>
 		<input type="checkbox" id="signup_<?php echo intval( $signup_object->id ) ?>" name="allsignups[]" value="<?php echo esc_attr( $signup_object->id ) ?>" />
 		<?php
 	}
@@ -309,15 +348,28 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 			bp_get_admin_url( 'users.php' )
 		);
 
-		echo $avatar . sprintf( '<strong><a href="%1$s" class="edit">%2$s</a></strong><br/>', esc_url( $activate_link ), $signup_object->user_login );
+		echo wp_kses(
+			$avatar,
+			array(
+				'img' => array(
+					'alt'    => true,
+					'src'    => true,
+					'srcset' => true,
+					'class'  => true,
+					'height' => true,
+					'width'  => true,
+				)
+			)
+		);
+		printf( '<strong><a href="%1$s" class="edit">%2$s</a></strong><br/>', esc_url( $activate_link ), esc_html( $signup_object->user_login ) );
 
 		$actions = array();
 
-		$actions['activate'] = sprintf( '<a href="%1$s">%2$s</a>', esc_url( $activate_link ), __( 'Activate', 'buddypress' ) );
-		$actions['resend']   = sprintf( '<a href="%1$s">%2$s</a>', esc_url( $email_link ), __( 'Email', 'buddypress' ) );
+		$actions['activate'] = sprintf( '<a href="%1$s">%2$s</a>', esc_url( $activate_link ), esc_html__( 'Activate', 'buddypress' ) );
+		$actions['resend']   = sprintf( '<a href="%1$s">%2$s</a>', esc_url( $email_link ), esc_html__( 'Email', 'buddypress' ) );
 
 		if ( current_user_can( 'delete_users' ) ) {
-			$actions['delete'] = sprintf( '<a href="%1$s" class="delete">%2$s</a>', esc_url( $delete_link ), __( 'Delete', 'buddypress' ) );
+			$actions['delete'] = sprintf( '<a href="%1$s" class="delete">%2$s</a>', esc_url( $delete_link ), esc_html__( 'Delete', 'buddypress' ) );
 		}
 
 		/**
@@ -330,6 +382,8 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 		 */
 		$actions = apply_filters( 'bp_members_ms_signup_row_actions', $actions, $signup_object );
 
+		// BuddyPress relies on WordPress's `WP_Users_List_Table::row_actions()`.
+		// phpcs:ignore WordPress.Security.EscapeOutput
 		echo $this->row_actions( $actions );
 	}
 
@@ -342,6 +396,29 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 	 */
 	public function column_name( $signup_object = null ) {
 		echo esc_html( $signup_object->user_name );
+
+		// Insert the extended profile modal content required by thickbox.
+		if ( ! bp_is_active( 'xprofile' ) ) {
+			return;
+		}
+
+		// Fetch registration field data once only.
+		if ( ! $this->signup_field_labels ) {
+			$field_groups = bp_xprofile_get_groups(
+				array(
+					'fetch_fields'       => true,
+					'signup_fields_only' => true,
+				)
+			);
+
+			foreach ( $field_groups as $field_group ) {
+				foreach ( $field_group->fields as $field ) {
+					$this->signup_field_labels[ $field->id ] = $field->name;
+				}
+			}
+		}
+
+		bp_members_admin_preview_signup_profile_info( $this->signup_field_labels, $signup_object );
 	}
 
 	/**
@@ -363,7 +440,7 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 	 * @param object|null $signup_object The signup data object.
 	 */
 	public function column_registered( $signup_object = null ) {
-		echo mysql2date( 'Y/m/d', $signup_object->registered );
+		echo esc_html( mysql2date( 'Y/m/d g:i:s a', $signup_object->registered ) );
 	}
 
 	/**
@@ -374,11 +451,28 @@ class BP_Members_List_Table extends WP_Users_List_Table {
 	 * @param object|null $signup_object The signup data object.
 	 */
 	public function column_date_sent( $signup_object = null ) {
-		echo mysql2date( 'Y/m/d', $signup_object->date_sent );
+		if ( $signup_object->count_sent > 0 ) {
+			echo esc_html( mysql2date( 'Y/m/d g:i:s a', $signup_object->date_sent ) );
+		} else {
+			$message = esc_html__( 'Not yet notified', 'buddypress' );
+
+			/**
+			 * Filters the "not yet sent" message for "Last Sent"
+			 * column in Manage Signups list table.
+			 *
+			 * @since 10.0.0
+			 *
+			 * @param string      $message       "Not yet sent" message.
+			 * @param object|null $signup_object Signup object instance.
+			 */
+			$message = apply_filters( 'bp_members_signup_date_sent_unsent_message', $message, $signup_object );
+
+			echo esc_html( $message );
+		}
 	}
 
 	/**
-	 * Display number of time an activation email has been sent.
+	 * Display number of times an activation email has been sent.
 	 *
 	 * @since 2.0.0
 	 *

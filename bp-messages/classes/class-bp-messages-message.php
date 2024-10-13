@@ -13,7 +13,9 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Single message class.
  */
+#[AllowDynamicProperties]
 class BP_Messages_Message {
+
 	/**
 	 * ID of the message.
 	 *
@@ -59,9 +61,9 @@ class BP_Messages_Message {
 	/**
 	 * Message recipients.
 	 *
-	 * @var bool|array
+	 * @var array
 	 */
-	public $recipients = false;
+	public $recipients = array();
 
 	/**
 	 * Constructor.
@@ -79,6 +81,8 @@ class BP_Messages_Message {
 
 	/**
 	 * Set up data related to a specific message object.
+	 *
+	 * @global wpdb $wpdb WordPress database object.
 	 *
 	 * @param int $id ID of the message.
 	 */
@@ -100,6 +104,8 @@ class BP_Messages_Message {
 	/**
 	 * Send a message.
 	 *
+	 * @global wpdb $wpdb WordPress database object.
+	 *
 	 * @return int|bool ID of the newly created message on success, false on failure.
 	 */
 	public function send() {
@@ -120,7 +126,7 @@ class BP_Messages_Message {
 		 *
 		 * @since 1.0.0
 		 *
-		 * @param BP_Messages_Message $this Current instance of the message item being saved. Passed by reference.
+		 * @param BP_Messages_Message $message Current instance of the message item being saved. Passed by reference.
 		 */
 		do_action_ref_array( 'messages_message_before_save', array( &$this ) );
 
@@ -169,7 +175,7 @@ class BP_Messages_Message {
 		 *
 		 * @since 1.0.0
 		 *
-		 * @param BP_Messages_Message $this Current instance of the message item being saved. Passed by reference.
+		 * @param BP_Messages_Message $message Current instance of the message item being saved. Passed by reference.
 		 */
 		do_action_ref_array( 'messages_message_after_save', array( &$this ) );
 
@@ -178,6 +184,8 @@ class BP_Messages_Message {
 
 	/**
 	 * Get a list of recipients for a message.
+	 *
+	 * @global wpdb $wpdb WordPress database object.
 	 *
 	 * @return object $value List of recipients for a message.
 	 */
@@ -220,7 +228,7 @@ class BP_Messages_Message {
 		 *
 		 * @since 2.8.0
 		 *
-		 * @param array $recipient_ids Array of recipients IDs that were retrieved based on submitted usernames.
+		 * @param array $recipient_ids       Array of recipients IDs that were retrieved based on submitted usernames.
 		 * @param array $recipient_usernames Array of recipients usernames that were submitted by a user.
 		 */
 		return apply_filters( 'messages_message_get_recipient_ids', $recipient_ids, $recipient_usernames );
@@ -228,6 +236,8 @@ class BP_Messages_Message {
 
 	/**
 	 * Get the ID of the message last sent by the logged-in user for a given thread.
+	 *
+	 * @global wpdb $wpdb WordPress database object.
 	 *
 	 * @param int $thread_id ID of the thread.
 	 *
@@ -245,6 +255,8 @@ class BP_Messages_Message {
 
 	/**
 	 * Check whether a user is the sender of a message.
+	 *
+	 * @global wpdb $wpdb WordPress database object.
 	 *
 	 * @param int $user_id ID of the user.
 	 * @param int $message_id ID of the message.
@@ -264,6 +276,8 @@ class BP_Messages_Message {
 
 	/**
 	 * Get the ID of the sender of a message.
+	 *
+	 * @global wpdb $wpdb WordPress database object.
 	 *
 	 * @param int $message_id ID of the message.
 	 *

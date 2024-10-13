@@ -17,11 +17,13 @@ defined( 'ABSPATH' ) || exit;
  *
  * @since 1.0.0
  */
+#[AllowDynamicProperties]
 class BP_Messages_Notice {
+
 	/**
 	 * The notice ID.
 	 *
-	 * @var int
+	 * @var int|null
 	 */
 	public $id = null;
 
@@ -61,7 +63,7 @@ class BP_Messages_Notice {
 	 * @param int|null $id Optional. The ID of the current notice.
 	 */
 	public function __construct( $id = null ) {
-		if ( $id ) {
+		if ( ! empty( $id ) ) {
 			$this->id = (int) $id;
 			$this->populate();
 		}
@@ -73,6 +75,8 @@ class BP_Messages_Notice {
 	 * Runs during constructor.
 	 *
 	 * @since 1.0.0
+	 *
+	 * @global wpdb $wpdb WordPress database object.
 	 */
 	public function populate() {
 		global $wpdb;
@@ -94,6 +98,8 @@ class BP_Messages_Notice {
 	 *
 	 * @since 1.0.0
 	 *
+	 * @global wpdb $wpdb WordPress database object.
+	 *
 	 * @return bool
 	 */
 	public function save() {
@@ -111,7 +117,7 @@ class BP_Messages_Notice {
 		 *
 		 * @since 1.0.0
 		 *
-		 * @param BP_Messages_Notice $this Current instance of the message notice item being saved. Passed by reference.
+		 * @param BP_Messages_Notice $notice Current instance of the message notice item being saved. Passed by reference.
 		 */
 		do_action_ref_array( 'messages_notice_before_save', array( &$this ) );
 
@@ -139,7 +145,7 @@ class BP_Messages_Notice {
 		 *
 		 * @since 1.0.0
 		 *
-		 * @param BP_Messages_Notice $this Current instance of the message item being saved. Passed by reference.
+		 * @param BP_Messages_Notice $notice Current instance of the message item being saved. Passed by reference.
 		 */
 		do_action_ref_array( 'messages_notice_after_save', array( &$this ) );
 
@@ -175,6 +181,8 @@ class BP_Messages_Notice {
 	 *
 	 * @since 1.0.0
 	 *
+	 * @global wpdb $wpdb WordPress database object.
+	 *
 	 * @return bool
 	 */
 	public function delete() {
@@ -185,7 +193,7 @@ class BP_Messages_Notice {
 		 *
 		 * @since 1.0.0
 		 *
-		 * @param BP_Messages_Notice $this Current instance of the message notice item being deleted.
+		 * @param BP_Messages_Notice $notice Current instance of the message notice item being deleted.
 		 */
 		do_action( 'messages_notice_before_delete', $this );
 
@@ -201,7 +209,7 @@ class BP_Messages_Notice {
 		 *
 		 * @since 2.8.0
 		 *
-		 * @param BP_Messages_Notice $this Current instance of the message notice item being deleted.
+		 * @param BP_Messages_Notice $notice Current instance of the message notice item being deleted.
 		 */
 		do_action( 'messages_notice_after_delete', $this );
 
@@ -217,20 +225,25 @@ class BP_Messages_Notice {
 	 *
 	 * @since 1.0.0
 	 *
+	 * @global wpdb $wpdb WordPress database object.
+	 *
 	 * @param array $args {
 	 *     Array of parameters.
 	 *     @type int $pag_num  Number of notices per page. Defaults to 20.
 	 *     @type int $pag_page The page number.  Defaults to 1.
 	 * }
-	 * @return object List of notices to display.
+	 * @return array List of notices to display.
 	 */
 	public static function get_notices( $args = array() ) {
 		global $wpdb;
 
-		$r = wp_parse_args( $args, array(
-			'pag_num'  => 20, // Number of notices per page.
-			'pag_page' => 1   // Page number.
-		) );
+		$r = bp_parse_args(
+			$args,
+			array(
+				'pag_num'  => 20, // Number of notices per page.
+				'pag_page' => 1 , // Page number.
+			)
+		);
 
 		$limit_sql = '';
 		if ( (int) $r['pag_num'] >= 0 ) {
@@ -252,7 +265,8 @@ class BP_Messages_Notice {
 		 *
 		 * @since 2.8.0
 		 *
-		 * @param array $r Array of parameters.
+		 * @param array $notices List of notices sorted by date and paginated.
+		 * @param array $r       Array of parameters.
 		 */
 		return apply_filters( 'messages_notice_get_notices', $notices, $r );
 	}
@@ -261,6 +275,8 @@ class BP_Messages_Notice {
 	 * Returns the total number of recorded notices.
 	 *
 	 * @since 1.0.0
+	 *
+	 * @global wpdb $wpdb WordPress database object.
 	 *
 	 * @return int
 	 */
@@ -275,8 +291,10 @@ class BP_Messages_Notice {
 		 * Filters the total number of notices.
 		 *
 		 * @since 2.8.0
+		 *
+		 * @param int $notice_count Total number of recorded notices.
 		 */
-		return (int) apply_filters( 'messages_notice_get_total_notice_count', $notice_count );
+		return apply_filters( 'messages_notice_get_total_notice_count', (int) $notice_count );
 	}
 
 	/**
@@ -284,7 +302,9 @@ class BP_Messages_Notice {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @return object The BP_Messages_Notice object.
+	 * @global wpdb $wpdb WordPress database object.
+	 *
+	 * @return BP_Messages_Notice
 	 */
 	public static function get_active() {
 		$notice = wp_cache_get( 'active_notice', 'bp_messages' );
@@ -304,6 +324,8 @@ class BP_Messages_Notice {
 		 * Gives ability to filter the active notice that should be displayed on the front end.
 		 *
 		 * @since 2.8.0
+		 *
+		 * @param BP_Messages_Notice $notice The notice object.
 		 */
 		return apply_filters( 'messages_notice_get_active', $notice );
 	}

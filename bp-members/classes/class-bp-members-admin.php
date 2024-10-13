@@ -54,32 +54,164 @@ class BP_Members_Admin {
 	/** Other *****************************************************************/
 
 	/**
+	 * Support forum link.
+	 *
+	 * @since 14.0.0
+	 * @var string
+	 */
+	private $bp_forum = '';
+
+	/**
+	 * Redirect.
+	 *
+	 * @since 2.0.0
+	 * @var string
+	 */
+	public $redirect;
+
+	/**
 	 * Screen id for edit user's profile page.
 	 *
+	 * @since 2.0.0
 	 * @var string
 	 */
 	public $user_page = '';
 
 	/**
-	 * Setup BP Members Admin.
+	 * User capability.
 	 *
 	 * @since 2.0.0
-	 *
-	 * @return BP_Members_Admin
+	 * @var string
 	 */
-	public static function register_members_admin() {
-		if ( ! is_admin() ) {
-			return;
-		}
+	public $capability;
 
-		$bp = buddypress();
+	/**
+	 * Show Profile Screen id.
+	 *
+	 * @since 2.0.0
+	 * @var string
+	 */
+	public $user_profile;
 
-		if ( empty( $bp->members->admin ) ) {
-			$bp->members->admin = new self;
-		}
+	/**
+	 * Current user ID.
+	 *
+	 * @since 2.0.0
+	 * @var int
+	 */
+	public $current_user_id;
 
-		return $bp->members->admin;
-	}
+	/**
+	 * User ID being edited.
+	 *
+	 * @since 2.0.0
+	 * @var int
+	 */
+	public $user_id = 0;
+
+	/**
+	 * Is a member editing their own profile.
+	 *
+	 * @since 2.0.0
+	 * @var bool
+	 */
+	public $is_self_profile = false;
+
+	/**
+	 * The screen ids to load specific css for.
+	 *
+	 * @since 2.0.0
+	 * @var array
+	 */
+	public $screen_id = array();
+
+	/**
+	 * The stats metabox default position.
+	 *
+	 * @since 2.0.0
+	 * @var stdClass
+	 */
+	public $stats_metabox;
+
+	/**
+	 * Edit user's profile args.
+	 *
+	 * @since 2.0.0
+	 * @var array
+	 */
+	public $edit_profile_args;
+
+	/**
+	 * Edit user's profile URL.
+	 *
+	 * @since 2.0.0
+	 * @var string
+	 */
+	public $edit_profile_url = '';
+
+	/**
+	 * Edit URL.
+	 *
+	 * @since 2.0.0
+	 * @var string
+	 */
+	public $edit_url = '';
+
+	/**
+	 * Users page.
+	 *
+	 * @since 2.0.0
+	 * @var string
+	 */
+	public $users_page = '';
+
+	/**
+	 * Signups page.
+	 *
+	 * @since 2.0.0
+	 * @var string
+	 */
+	public $signups_page = '';
+
+	/**
+	 * Users URL.
+	 *
+	 * @since 2.0.0
+	 * @var string
+	 */
+	public $users_url;
+
+	/**
+	 * Users screen.
+	 *
+	 * @since 2.0.0
+	 * @var string
+	 */
+	public $users_screen;
+
+	/**
+	 * Members' Invite Page.
+	 *
+	 * @since 2.0.0
+	 * @var string
+	 */
+	public $members_invites_page = '';
+
+	/**
+	 * Status of BuddyPress network.
+	 *
+	 * @since 2.0.0
+	 * @var bool
+	 */
+	public $subsite_activated;
+
+	/**
+	 * Tools menu.
+	 *
+	 * @since 2.0.0
+	 * @var string
+	 */
+	public $tools_parent = 'tools.php';
 
 	/**
 	 * Constructor method.
@@ -100,16 +232,13 @@ class BP_Members_Admin {
 		$bp = buddypress();
 
 		// Paths and URLs
-		$this->admin_dir = trailingslashit( $bp->plugin_dir  . 'bp-members/admin' ); // Admin path.
-		$this->admin_url = trailingslashit( $bp->plugin_url  . 'bp-members/admin' ); // Admin URL.
+		$this->admin_dir = trailingslashit( $bp->plugin_dir . 'bp-members/admin' ); // Admin path.
+		$this->admin_url = trailingslashit( $bp->plugin_url . 'bp-members/admin' ); // Admin URL.
 		$this->css_url   = trailingslashit( $this->admin_url . 'css' ); // Admin CSS URL.
 		$this->js_url    = trailingslashit( $this->admin_url . 'js'  ); // Admin CSS URL.
 
 		// Capability depends on config.
 		$this->capability = bp_core_do_network_admin() ? 'manage_network_users' : 'edit_users';
-
-		// The Edit Profile Screen id.
-		$this->user_page = '';
 
 		// The Show Profile Screen id.
 		$this->user_profile = is_network_admin() ? 'users' : 'profile';
@@ -117,30 +246,15 @@ class BP_Members_Admin {
 		// The current user id.
 		$this->current_user_id = get_current_user_id();
 
-		// The user id being edited.
-		$this->user_id = 0;
-
-		// Is a member editing their own profile.
-		$this->is_self_profile = false;
-
-		// The screen ids to load specific css for.
-		$this->screen_id = array();
-
 		// The stats metabox default position.
-		$this->stats_metabox = new StdClass();
+		$this->stats_metabox = new stdClass();
 
 		// BuddyPress edit user's profile args.
 		$this->edit_profile_args = array( 'page' => 'bp-profile-edit' );
-		$this->edit_profile_url  = '';
-		$this->edit_url          = '';
 
 		// Data specific to signups.
-		$this->users_page   = '';
-		$this->signups_page = '';
 		$this->users_url    = bp_get_admin_url( 'users.php' );
 		$this->users_screen = bp_core_do_network_admin() ? 'users-network' : 'users';
-
-		$this->members_invites_page = '';
 
 		// Specific config: BuddyPress is not network activated.
 		$this->subsite_activated = (bool) is_multisite() && ! bp_is_network_activated();
@@ -148,6 +262,21 @@ class BP_Members_Admin {
 		// When BuddyPress is not network activated, only Super Admin can moderate signups.
 		if ( ! empty( $this->subsite_activated ) ) {
 			$this->capability = 'manage_network_users';
+		}
+
+		// Support forum link.
+		$this->bp_forum = sprintf(
+			'<a href="%1$s">%2$s</a>',
+			esc_url( 'https://buddypress.org/support/' ),
+			esc_html__( 'Support Forums', 'buddypress' )
+		);
+
+		/*
+		 * For consistency with non-Multisite, we add a Tools menu in
+		 * the Network Admin as a home for our Tools panel.
+		 */
+		if ( is_multisite() && bp_core_do_network_admin() ) {
+			$this->tools_parent = 'network-tools';
 		}
 	}
 
@@ -158,8 +287,7 @@ class BP_Members_Admin {
 	 */
 	private function setup_actions() {
 
-		/** Extended Profile *************************************************
-		 */
+		/** Extended Profile **************************************************/
 
 		// Enqueue all admin JS and CSS.
 		add_action( 'bp_admin_enqueue_scripts', array( $this, 'enqueue_scripts'   )        );
@@ -170,24 +298,32 @@ class BP_Members_Admin {
 		// Add menu item to all users menu.
 		add_action( 'admin_menu',               array( $this, 'admin_menus'       ), 5     );
 		add_action( 'network_admin_menu',       array( $this, 'admin_menus'       ), 5     );
-		add_action( 'user_admin_menu',          array( $this, 'user_profile_menu' ), 5     );
 
-		// Create the Profile Navigation (Profile/Extended Profile).
-		add_action( 'edit_user_profile',        array( $this, 'profile_nav'       ), 99, 1 );
-		add_action( 'show_user_profile',        array( $this, 'profile_nav'       ), 99, 1 );
+		if ( bp_members_is_community_profile_enabled() ) {
+			add_action( 'user_admin_menu', array( $this, 'user_profile_menu' ), 5     );
 
-		// Editing users of a specific site.
-		add_action( "admin_head-site-users.php", array( $this, 'profile_admin_head' ) );
+			// Create the Profile Navigation (Profile/Extended Profile).
+			add_action( 'edit_user_profile',        array( $this, 'profile_nav'       ), 99, 1 );
+			add_action( 'show_user_profile',        array( $this, 'profile_nav'       ), 99, 1 );
+
+			// Editing users of a specific site.
+			add_action( "admin_head-site-users.php", array( $this, 'profile_admin_head' ) );
+		}
 
 		// Add a row action to users listing.
 		if ( bp_core_do_network_admin() ) {
-			add_filter( 'ms_user_row_actions',        array( $this, 'row_actions'                    ), 10, 2 );
-			add_action( 'admin_init',                 array( $this, 'add_edit_profile_url_filter'    )        );
-			add_action( 'wp_after_admin_bar_render',  array( $this, 'remove_edit_profile_url_filter' )        );
+			if ( bp_members_is_community_profile_enabled() ) {
+				add_filter( 'ms_user_row_actions', array( $this, 'row_actions' ), 10, 2 );
+			}
+
+			add_action( 'admin_init', array( $this, 'add_edit_profile_url_filter' ) );
+			add_action( 'wp_after_admin_bar_render',  array( $this, 'remove_edit_profile_url_filter' ) );
 		}
 
 		// Add user row actions for single site.
-		add_filter( 'user_row_actions', array( $this, 'row_actions' ), 10, 2 );
+		if ( bp_members_is_community_profile_enabled() ) {
+			add_filter( 'user_row_actions', array( $this, 'row_actions' ), 10, 2 );
+		}
 
 		// Process changes to member type.
 		add_action( 'bp_members_admin_load', array( $this, 'process_member_type_update' ) );
@@ -246,6 +382,9 @@ class BP_Members_Admin {
 			// Filter WP admin users list table to include users of the specified type.
 			add_filter( 'pre_get_users', array( $this, 'users_table_filter_by_type' ) );
 		}
+
+		// Add the Members invitations submenu page to the tools submenu pages.
+		add_action( 'bp_admin_submenu_pages', array( $this, 'set_submenu_page' ), 10, 1 );
 	}
 
 	/**
@@ -283,6 +422,27 @@ class BP_Members_Admin {
 				'activate' => 1
 			) );
 		}
+	}
+
+	/**
+	 * Setup BP Members Admin.
+	 *
+	 * @since 2.0.0
+	 *
+	 * @return BP_Members_Admin|null
+	 */
+	public static function register_members_admin() {
+		if ( ! is_admin() ) {
+			return null;
+		}
+
+		$bp = buddypress();
+
+		if ( empty( $bp->members->admin ) ) {
+			$bp->members->admin = new self;
+		}
+
+		return $bp->members->admin;
 	}
 
 	/**
@@ -337,7 +497,7 @@ class BP_Members_Admin {
 
 		// Trust the 'bp_moderate' capability.
 		} else {
-			$retval = bp_current_user_can( 'bp_moderate' );
+			$retval = ( bp_current_user_can( 'edit_users' ) || bp_current_user_can( 'bp_moderate' ) );
 		}
 
 		return $retval;
@@ -434,7 +594,6 @@ class BP_Members_Admin {
 	 * Create the /user/ admin Profile submenus for all members.
 	 *
 	 * @since 2.1.0
-	 *
 	 */
 	public function user_profile_menu() {
 
@@ -471,46 +630,45 @@ class BP_Members_Admin {
 	 * Create the All Users / Profile > Edit Profile and All Users Signups submenus.
 	 *
 	 * @since 2.0.0
-	 *
 	 */
 	public function admin_menus() {
 
 		// Setup the hooks array.
 		$hooks = array();
 
-		// Manage user's profile.
-		$hooks['user'] = $this->user_page = add_submenu_page(
-			$this->user_profile . '.php',
-			__( 'Edit Profile',  'buddypress' ),
-			__( 'Edit Profile',  'buddypress' ),
-			'read',
-			'bp-profile-edit',
-			array( $this, 'user_admin' )
-		);
+		if ( bp_members_is_community_profile_enabled() ) {
+			// Manage user's profile.
+			$hooks['user'] = $this->user_page = add_submenu_page(
+				$this->user_profile . '.php',
+				__( 'Edit Profile',  'buddypress' ),
+				__( 'Edit Profile',  'buddypress' ),
+				'read',
+				'bp-profile-edit',
+				array( $this, 'user_admin' )
+			);
+		}
 
 		// Only show sign-ups where they belong.
 		if ( ( ! bp_is_network_activated() && ! is_network_admin() ) || ( is_network_admin() && bp_is_network_activated() ) ) {
 
+			$signups_menu_label = __( 'Manage Signups',  'buddypress' );
+
+			if ( bp_get_membership_requests_required() ) {
+				$signups_menu_label = __( 'Manage Pending Memberships',  'buddypress' );
+			}
+
 			// Manage signups.
 			$hooks['signups'] = $this->signups_page = add_users_page(
-				__( 'Manage Signups',  'buddypress' ),
-				__( 'Manage Signups',  'buddypress' ),
+				$signups_menu_label,
+				$signups_menu_label,
 				$this->capability,
 				'bp-signups',
 				array( $this, 'signups_admin' )
 			);
 		}
 
-		// For consistency with non-Multisite, we add a Tools menu in
-		// the Network Admin as a home for our Tools panel.
-		if ( is_multisite() && bp_core_do_network_admin() ) {
-			$tools_parent = 'network-tools';
-		} else {
-			$tools_parent = 'tools.php';
-		}
-
 		$hooks['members_invitations'] = $this->members_invites_page = add_submenu_page(
-			$tools_parent,
+			$this->tools_parent,
 			__( 'Manage Invitations',  'buddypress' ),
 			__( 'Manage Invitations',  'buddypress' ),
 			$this->capability,
@@ -563,9 +721,25 @@ class BP_Members_Admin {
 	}
 
 	/**
+	 * Include the Members Invitations tab to the Admin tabs needing specific inline styles.
+	 *
+	 * @since 10.0.0
+	 *
+	 * @param array $submenu_pages The BP_Admin submenu pages passed by reference.
+	 */
+	public function set_submenu_page( &$submenu_pages ) {
+		if ( isset( $submenu_pages['tools'] ) ) {
+			$submenu_pages['tools']['bp-members-invitations'] = get_plugin_page_hookname( 'bp-members-invitations', $this->tools_parent );
+		}
+	}
+
+	/**
 	 * Highlight the Users menu if on Edit Profile and check if on the user's admin profile.
 	 *
 	 * @since 2.1.0
+	 *
+	 * @global string $submenu_file The name of the submenu file.
+	 * @global string $parent_file  The name of the parent file.
 	 */
 	public function profile_admin_head() {
 		global $submenu_file, $parent_file;
@@ -650,53 +824,55 @@ class BP_Members_Admin {
 			return;
 		}
 
-		$min = bp_core_get_minified_asset_suffix();
-		$css = $this->css_url . "admin{$min}.css";
-
-		/**
-		 * Filters the CSS URL to enqueue in the Members admin area.
-		 *
-		 * @since 2.0.0
-		 *
-		 * @param string $css URL to the CSS admin file to load.
-		 */
-		$css = apply_filters( 'bp_members_admin_css', $css );
-
-		wp_enqueue_style( 'bp-members-css', $css, array(), bp_get_version() );
-
-		wp_style_add_data( 'bp-members-css', 'rtl', 'replace' );
-		if ( $min ) {
-			wp_style_add_data( 'bp-members-css', 'suffix', $min );
-		}
-
-		// Only load JavaScript for BuddyPress profile.
-		if ( get_current_screen()->id == $this->user_page ) {
-			$js = $this->js_url . "admin{$min}.js";
+		if ( bp_members_is_community_profile_enabled() ) {
+			$min = bp_core_get_minified_asset_suffix();
+			$css = $this->css_url . "admin{$min}.css";
 
 			/**
-			 * Filters the JS URL to enqueue in the Members admin area.
+			 * Filters the CSS URL to enqueue in the Members admin area.
 			 *
 			 * @since 2.0.0
 			 *
-			 * @param string $js URL to the JavaScript admin file to load.
+			 * @param string $css URL to the CSS admin file to load.
 			 */
-			$js = apply_filters( 'bp_members_admin_js', $js );
-			wp_enqueue_script( 'bp-members-js', $js, array( 'jquery' ), bp_get_version(), true );
+			$css = apply_filters( 'bp_members_admin_css', $css );
 
-			if ( ! bp_core_get_root_option( 'bp-disable-avatar-uploads' ) && buddypress()->avatar->show_avatars ) {
+			wp_enqueue_style( 'bp-members-css', $css, array(), bp_get_version() );
+
+			wp_style_add_data( 'bp-members-css', 'rtl', 'replace' );
+			if ( $min ) {
+				wp_style_add_data( 'bp-members-css', 'suffix', $min );
+			}
+
+			// Only load JavaScript for BuddyPress profile.
+			if ( get_current_screen()->id == $this->user_page ) {
+				$js = $this->js_url . 'admin.js';
+
 				/**
-				 * Get Thickbox.
+				 * Filters the JS URL to enqueue in the Members admin area.
 				 *
-				 * We cannot simply use add_thickbox() here as WordPress is not playing
-				 * nice with Thickbox width/height see https://core.trac.wordpress.org/ticket/17249
-				 * Using media-upload might be interesting in the future for the send to editor stuff
-				 * and we make sure the tb_window is wide enough
+				 * @since 2.0.0
+				 *
+				 * @param string $js URL to the JavaScript admin file to load.
 				 */
-				wp_enqueue_style ( 'thickbox' );
-				wp_enqueue_script( 'media-upload' );
+				$js = apply_filters( 'bp_members_admin_js', $js );
+				wp_enqueue_script( 'bp-members-js', $js, array(), bp_get_version(), true );
 
-				// Get Avatar Uploader.
-				bp_attachments_enqueue_scripts( 'BP_Attachment_Avatar' );
+				if ( ! bp_core_get_root_option( 'bp-disable-avatar-uploads' ) && buddypress()->avatar->show_avatars ) {
+					/**
+					 * Get Thickbox.
+					 *
+					 * We cannot simply use add_thickbox() here as WordPress is not playing
+					 * nice with Thickbox width/height see https://core.trac.wordpress.org/ticket/17249
+					 * Using media-upload might be interesting in the future for the send to editor stuff
+					 * and we make sure the tb_window is wide enough
+					 */
+					wp_enqueue_style ( 'thickbox' );
+					wp_enqueue_script( 'media-upload' );
+
+					// Get Avatar Uploader.
+					bp_attachments_enqueue_scripts( 'BP_Attachment_Avatar' );
+				}
 			}
 		}
 
@@ -761,11 +937,11 @@ class BP_Members_Admin {
 			 */
 			if ( current_user_can( 'edit_user', $user->ID ) ) : ?>
 
-				<a class="nav-tab<?php echo esc_attr( $wp_active ); ?>" href="<?php echo esc_url( $wordpress_url );?>"><?php _e( 'Profile', 'buddypress' ); ?></a>
+				<a class="nav-tab<?php echo esc_attr( $wp_active ); ?>" href="<?php echo esc_url( $wordpress_url );?>"><?php esc_html_e( 'Profile', 'buddypress' ); ?></a>
 
 			<?php endif; ?>
 
-			<a class="nav-tab<?php echo esc_attr( $bp_active ); ?>" href="<?php echo esc_url( $community_url );?>"><?php _e( 'Extended Profile', 'buddypress' ); ?></a>
+			<a class="nav-tab<?php echo esc_attr( $bp_active ); ?>" href="<?php echo esc_url( $community_url );?>"><?php esc_html_e( 'Extended Profile', 'buddypress' ); ?></a>
 		</h2>
 
 		<?php
@@ -788,7 +964,7 @@ class BP_Members_Admin {
 
 		// Can current user edit this profile?
 		if ( ! $this->member_can_edit( $user_id ) ) {
-			wp_die( __( 'You cannot edit the requested user.', 'buddypress' ) );
+			wp_die( esc_html__( 'You cannot edit the requested user.', 'buddypress' ) );
 		}
 
 		// Build redirection URL.
@@ -993,7 +1169,7 @@ class BP_Members_Admin {
 	 */
 	public function user_admin() {
 
-		if ( ! bp_current_user_can( 'bp_moderate' ) && empty( $this->is_self_profile ) ) {
+		if ( ! bp_current_user_can( 'edit_users' ) && ! bp_current_user_can( 'bp_moderate' ) && empty( $this->is_self_profile ) ) {
 			die( '-1' );
 		}
 
@@ -1005,7 +1181,8 @@ class BP_Members_Admin {
 		if ( true === $this->is_self_profile ) {
 			$title = __( 'Profile',   'buddypress' );
 		} else {
-			$title = __( 'Edit User', 'buddypress' );
+			/* translators: %s: User's display name. */
+			$title = sprintf( __( 'Edit User %s', 'buddypress' ), $user->display_name );
 		}
 
 		// Construct URL for form.
@@ -1085,14 +1262,16 @@ class BP_Members_Admin {
 
 			<?php else : ?>
 
-				<p><?php
+				<p>
+					<?php
 					printf(
 						'%1$s <a href="%2$s">%3$s</a>',
-						__( 'No user found with this ID.', 'buddypress' ),
+						esc_html__( 'No user found with this ID.', 'buddypress' ),
 						esc_url( bp_get_admin_url( 'users.php' ) ),
-						__( 'Go back and try again.', 'buddypress' )
+						esc_html__( 'Go back and try again.', 'buddypress' )
 					);
-				?></p>
+					?>
+				</p>
 
 			<?php endif; ?>
 
@@ -1162,7 +1341,7 @@ class BP_Members_Admin {
 						<span id="timestamp">
 							<?php
 							/* translators: %s: registration date */
-							printf( __( 'Registered on: %s', 'buddypress' ), '<strong>' . $date . '</strong>' );
+							printf( esc_html__( 'Registered on: %s', 'buddypress' ), '<strong>' . esc_html( $date ) . '</strong>' );
 							?>
 						</span>
 					</div>
@@ -1174,7 +1353,7 @@ class BP_Members_Admin {
 			<div id="major-publishing-actions">
 
 				<div id="publishing-action">
-					<a class="button bp-view-profile" href="<?php echo esc_url( bp_core_get_user_domain( $user->ID ) ); ?>" target="_blank"><?php esc_html_e( 'View Profile', 'buddypress' ); ?></a>
+					<a class="button bp-view-profile" href="<?php echo esc_url( bp_members_get_user_url( $user->ID ) ); ?>" target="_blank"><?php esc_html_e( 'View Profile', 'buddypress' ); ?></a>
 					<?php submit_button( esc_html__( 'Update Profile', 'buddypress' ), 'primary', 'save', false ); ?>
 				</div>
 				<div class="clear"></div>
@@ -1197,7 +1376,7 @@ class BP_Members_Admin {
 		<p>
 			<?php
 			/* translators: %s: member name */
-			printf( __( '%s has been marked as a spammer. All BuddyPress data associated with the user has been removed', 'buddypress' ), esc_html( bp_core_get_user_displayname( $user->ID ) ) );
+			printf( esc_html__( '%s has been marked as a spammer. All BuddyPress data associated with the user has been removed', 'buddypress' ), esc_html( bp_core_get_user_displayname( $user->ID ) ) );
 			?>
 		</p>
 	<?php
@@ -1233,7 +1412,7 @@ class BP_Members_Admin {
 			<li class="bp-members-profile-stats">
 				<?php
 				/* translators: %s: date */
-				printf( __( 'Last active: %1$s', 'buddypress' ), '<strong>' . $date . '</strong>' );
+				printf( esc_html__( 'Last active: %1$s', 'buddypress' ), '<strong>' . esc_html( $date ) . '</strong>' );
 				?>
 			</li>
 
@@ -1272,12 +1451,18 @@ class BP_Members_Admin {
 
 		<div class="avatar">
 
-			<?php echo bp_core_fetch_avatar( array(
-				'item_id' => $user->ID,
-				'object'  => 'user',
-				'type'    => 'full',
-				'title'   => $user->display_name
-			) ); ?>
+			<?php
+			// Escaping is done in `bp_core_fetch_avatar()`.
+			// phpcs:ignore WordPress.Security.EscapeOutput
+			echo bp_core_fetch_avatar(
+				array(
+					'item_id' => $user->ID,
+					'object'  => 'user',
+					'type'    => 'full',
+					'title'   => $user->display_name
+				)
+			);
+			?>
 
 			<?php if ( bp_get_user_has_avatar( $user->ID ) ) :
 
@@ -1329,6 +1514,7 @@ class BP_Members_Admin {
 		$types        = bp_get_member_types( array(), 'objects' );
 		$current_type = (array) bp_get_member_type( $user->ID, false );
 		$types_count  = count( array_filter( $current_type ) );
+		$disabled     = ! bp_current_user_can( 'edit_users' ) && ! bp_current_user_can( 'bp_moderate' );
 		?>
 
 		<label for="bp-members-profile-member-type" class="screen-reader-text">
@@ -1341,7 +1527,7 @@ class BP_Members_Admin {
 			<?php foreach ( $types as $type ) : ?>
 				<li>
 					<label class="selectit">
-						<input value="<?php echo esc_attr( $type->name ) ?>" name="bp-members-profile-member-type[]" type="checkbox" <?php checked( true, in_array( $type->name, $current_type ) ); ?>>
+						<input value="<?php echo esc_attr( $type->name ) ?>" name="bp-members-profile-member-type[]" type="checkbox" <?php checked( true, in_array( $type->name, $current_type ) ); ?> <?php disabled( $disabled ); ?>>
 						<?php echo esc_html( $type->labels['singular_name'] ); ?>
 					</label>
 				</li>
@@ -1368,7 +1554,7 @@ class BP_Members_Admin {
 		check_admin_referer( 'bp-member-type-change-' . $user_id, 'bp-member-type-nonce' );
 
 		// Permission check.
-		if ( ! bp_current_user_can( 'bp_moderate' ) && $user_id != bp_loggedin_user_id() ) {
+		if ( ! bp_current_user_can( 'edit_users' ) && ! bp_current_user_can( 'bp_moderate' ) ) {
 			return;
 		}
 
@@ -1524,6 +1710,8 @@ class BP_Members_Admin {
 	 *
 	 * @since 2.0.0
 	 *
+	 * @global wpdb $wpdb The WordPress database object.
+	 *
 	 * @param WP_User_Query|null $query The users query.
 	 * @return WP_User_Query|null The users query without the signups.
 	 */
@@ -1565,6 +1753,8 @@ class BP_Members_Admin {
 	 * Filter the WP Users List Table views to include 'bp-signups'.
 	 *
 	 * @since 2.0.0
+	 *
+	 * @global string $role The name of the WP Role.
 	 *
 	 * @param array $views WP List Table views.
 	 * @return array The views with the signup view added.
@@ -1628,7 +1818,7 @@ class BP_Members_Admin {
 	 *
 	 * @since 2.0.0
 	 *
-	 * @global $bp_members_signup_list_table
+	 * @global object $bp_members_signup_list_table
 	 */
 	public function signups_admin_load() {
 		global $bp_members_signup_list_table;
@@ -1656,7 +1846,7 @@ class BP_Members_Admin {
 		 */
 		$allowed_actions = apply_filters( 'bp_signups_admin_allowed_actions', array( 'do_delete', 'do_activate', 'do_resend' ) );
 
-		// Prepare the display of the Community Profile screen.
+		// Prepare the display of the Signups screen.
 		if ( ! in_array( $doaction, $allowed_actions ) || ( -1 == $doaction ) ) {
 
 			if ( is_network_admin() ) {
@@ -1678,21 +1868,42 @@ class BP_Members_Admin {
 				'<p>' . __( 'Using the search form, you can find pending accounts more easily. The Username and Email fields will be included in the search.', 'buddypress' ) . '</p>'
 			) );
 
+			$signup_help_content = '<p>' . esc_html__( 'Hovering over a row in the pending accounts list will display action links that allow you to manage pending accounts. You can perform the following actions:', 'buddypress' ) . '</p>';
+
+			if ( bp_get_membership_requests_required() ) {
+				$signup_help_content .= '<ul><li>' . esc_html__( '"Activate" will activate the user immediately without requiring that they validate their email.', 'buddypress' ) .'</li>' .
+					'<li>' . esc_html__( '"Approve Request" or "Resend Approval" takes you to the confirmation screen before being able to send the activation link to the desired pending request. You can only send the activation email once per day.', 'buddypress' ) . '</li>';
+
+				if ( bp_is_active( 'xprofile' ) ) {
+					$signup_help_content .=	'<li>' . esc_html__( '"Profile Info" will display extended profile information for the request.', 'buddypress' ) . '</li>';
+				}
+
+				$signup_help_content .= '<li>' . esc_html__( '"Delete" allows you to delete a pending account from your site. You will be asked to confirm this deletion.', 'buddypress' ) . '</li></ul>';
+			} else {
+				$signup_help_content .= '<ul><li>' . esc_html__( '"Email" takes you to the confirmation screen before being able to send the activation link to the desired pending account. You can only send the activation email once per day.', 'buddypress' ) . '</li>' .
+					'<li>' . __( '"Delete" allows you to delete a pending account from your site. You will be asked to confirm this deletion.', 'buddypress' ) . '</li></ul>';
+			}
+
+			$signup_help_content .= '<p>' . esc_html__( 'By clicking on a Username you will be able to activate a pending account from the confirmation screen.', 'buddypress' ) . '</p>' .
+				'<p>' . __( 'Bulk actions allow you to perform these 3 actions for the selected rows.', 'buddypress' ) . '</p>';
+
 			get_current_screen()->add_help_tab( array(
 				'id'      => 'bp-signups-actions',
 				'title'   => __( 'Actions', 'buddypress' ),
-				'content' =>
-				'<p>' . __( 'Hovering over a row in the pending accounts list will display action links that allow you to manage pending accounts. You can perform the following actions:', 'buddypress' ) . '</p>' .
-				'<ul><li>' . __( '"Email" takes you to the confirmation screen before being able to send the activation link to the desired pending account. You can only send the activation email once per day.', 'buddypress' ) . '</li>' .
-				'<li>' . __( '"Delete" allows you to delete a pending account from your site. You will be asked to confirm this deletion.', 'buddypress' ) . '</li></ul>' .
-				'<p>' . __( 'By clicking on a Username you will be able to activate a pending account from the confirmation screen.', 'buddypress' ) . '</p>' .
-				'<p>' . __( 'Bulk actions allow you to perform these 3 actions for the selected rows.', 'buddypress' ) . '</p>'
+				'content' => $signup_help_content
 			) );
+
+			$manage_pending_ua = sprintf(
+				'<a href="%1$s">%2$s</a>',
+				esc_url( 'https://github.com/buddypress/buddypress/blob/master/docs/user/administration/users/signups.md#manage-pending-user-accounts' ),
+				esc_html__( 'Managing Pending User Accounts', 'buddypress' )
+			);
 
 			// Help panel - sidebar links.
 			get_current_screen()->set_help_sidebar(
-				'<p><strong>' . __( 'For more information:', 'buddypress' ) . '</strong></p>' .
-				'<p>' . __( '<a href="https://buddypress.org/support/">Support Forums</a>', 'buddypress' ) . '</p>'
+				'<p><strong>' . esc_html__( 'For more information:', 'buddypress' ) . '</strong></p>' .
+				'<p>' . $manage_pending_ua . '</p>' .
+				'<p>' . $this->bp_forum . '</p>'
 			);
 
 			// Add accessible hidden headings and text for the Pending Users screen.
@@ -1704,6 +1915,25 @@ class BP_Members_Admin {
 				/* translators: accessibility text */
 				'heading_list'       => __( 'Pending users list', 'buddypress' ),
 			) );
+
+			// Use thickbox to display the extended profile information.
+			if ( bp_is_active( 'xprofile' ) || bp_members_site_requests_enabled() ) {
+				wp_enqueue_style( 'thickbox' );
+				wp_enqueue_script(
+					'bp-signup-preview',
+					$this->js_url . 'signup-preview' . bp_core_get_minified_asset_suffix() . '.js',
+					array( 'bp-thickbox', 'jquery' ),
+					bp_get_version(),
+					true
+				);
+				wp_localize_script(
+					'bp-signup-preview',
+					'bpSignupPreview',
+					array(
+						'modalLabel' => __( 'Profile info preview', 'buddypress' ),
+					)
+				);
+			}
 
 		} else {
 			if ( ! empty( $_REQUEST['signup_ids' ] ) ) {
@@ -1970,21 +2200,21 @@ class BP_Members_Admin {
 				case 'do_resend':
 					$notice = array(
 						'class'   => 'error',
-						'message' => esc_html__( 'There was a problem sending the activation emails. Please try again.', 'buddypress' ),
+						'message' => __( 'There was a problem sending the activation emails. Please try again.', 'buddypress' ),
 					);
 					break;
 
 				case 'do_activate':
 					$notice = array(
 						'class'   => 'error',
-						'message' => esc_html__( 'There was a problem activating accounts. Please try again.', 'buddypress' ),
+						'message' => __( 'There was a problem activating accounts. Please try again.', 'buddypress' ),
 					);
 					break;
 
 				case 'do_delete':
 					$notice = array(
 						'class'   => 'error',
-						'message' => esc_html__( 'There was a problem deleting sign-ups. Please try again.', 'buddypress' ),
+						'message' => __( 'There was a problem deleting sign-ups. Please try again.', 'buddypress' ),
 					);
 					break;
 			}
@@ -2024,7 +2254,7 @@ class BP_Members_Admin {
 
 			<?php endif; ?>
 
-				<p><?php echo $notice['message']; ?></p>
+				<p><?php echo esc_html( $notice['message'] ); ?></p>
 
 				<?php if ( ! empty( $_REQUEST['notactivated'] ) || ! empty( $_REQUEST['notdeleted'] ) || ! empty( $_REQUEST['notsent'] ) ) :?>
 
@@ -2056,8 +2286,8 @@ class BP_Members_Admin {
 	 *
 	 * @since 2.0.0
 	 *
-	 * @global $plugin_page
-	 * @global $bp_members_signup_list_table
+	 * @global string $plugin_page
+	 * @global object $bp_members_signup_list_table
 	 */
 	public function signups_admin_index() {
 		global $plugin_page, $bp_members_signup_list_table;
@@ -2106,7 +2336,7 @@ class BP_Members_Admin {
 		?>
 
 		<div class="wrap">
-			<h1 class="wp-heading-inline"><?php _e( 'Users', 'buddypress' ); ?></h1>
+			<h1 class="wp-heading-inline"><?php esc_html_e( 'Users', 'buddypress' ); ?></h1>
 
 			<?php if ( current_user_can( 'create_users' ) ) : ?>
 
@@ -2119,7 +2349,7 @@ class BP_Members_Admin {
 			<?php endif;
 
 			if ( $usersearch ) {
-				printf( '<span class="subtitle">' . __( 'Search results for &#8220;%s&#8221;', 'buddypress' ) . '</span>', esc_html( $usersearch ) );
+				printf( '<span class="subtitle">' . esc_html__( 'Search results for &#8220;%s&#8221;', 'buddypress' ) . '</span>', esc_html( $usersearch ) );
 			}
 			?>
 
@@ -2173,7 +2403,7 @@ class BP_Members_Admin {
 		) );
 
 		$signups    = $signups_query['signups'];
-		$signup_ids = wp_list_pluck( $signups, 'signup_id' );
+		$signup_ids = wp_list_pluck( $signups, 'id' );
 
 		// Set up strings.
 		switch ( $action ) {
@@ -2196,13 +2426,24 @@ class BP_Members_Admin {
 				break;
 
 			case 'resend' :
-				$header_text = __( 'Resend Activation Emails', 'buddypress' );
-				if ( 1 == count( $signup_ids ) ) {
-					$helper_text = __( 'You are about to resend an activation email to the following account:', 'buddypress' );
+
+				if ( bp_get_membership_requests_required() ) {
+					$header_text = __( 'Approve Membership Requests', 'buddypress' );
+					if ( 1 === count( $signup_ids ) ) {
+						$helper_text = __( 'You are about to send an approval email to the following user:', 'buddypress' );
+					} else {
+						$helper_text = __( 'You are about to send approval emails to the following users:', 'buddypress' );
+					}
 				} else {
-					$helper_text = __( 'You are about to resend an activation email to the following accounts:', 'buddypress' );
+					$header_text = __( 'Resend Activation Emails', 'buddypress' );
+					if ( 1 === count( $signup_ids ) ) {
+						$helper_text = __( 'You are about to resend an activation email to the following account:', 'buddypress' );
+					} else {
+						$helper_text = __( 'You are about to resend an activation email to the following accounts:', 'buddypress' );
+					}
 				}
 				break;
+
 		}
 
 		// These arguments are added to all URLs.
@@ -2231,15 +2472,15 @@ class BP_Members_Admin {
 
 		// Prefetch registration field data.
 		$fdata = array();
-		if ( 'activate' === $action && bp_is_active( 'xprofile' ) ) {
+		if ( bp_is_active( 'xprofile' ) && ( 'activate' == $action || ( 'resend' == $action && bp_get_membership_requests_required() ) ) ) {
 			$field_groups = bp_xprofile_get_groups( array(
 				'exclude_fields'    => 1,
 				'update_meta_cache' => false,
 				'fetch_fields'      => true,
 			) );
 
-			foreach( $field_groups as $fg ) {
-				foreach( $fg->fields as $f ) {
+			foreach ( $field_groups as $fg ) {
+				foreach ( $fg->fields as $f ) {
 					$fdata[ $f->id ] = $f->name;
 				}
 			}
@@ -2255,7 +2496,11 @@ class BP_Members_Admin {
 
 			<ol class="bp-signups-list">
 			<?php foreach ( $signups as $signup ) :
-				$last_notified = mysql2date( 'Y/m/d g:i:s a', $signup->date_sent );
+				if ( $signup->count_sent > 0 ) {
+					$last_notified = mysql2date( 'Y/m/d g:i:s a', $signup->date_sent );
+				} else {
+					$last_notified = __( 'Not yet notified', 'buddypress' );
+				}
 				$profile_field_ids = array();
 
 				// Get all xprofile field IDs except field 1.
@@ -2267,7 +2512,7 @@ class BP_Members_Admin {
 				<li>
 					<strong><?php echo esc_html( $signup->user_login ) ?></strong>
 
-					<?php if ( 'activate' == $action ) : ?>
+					<?php if ( 'activate' == $action || ( 'resend' == $action && bp_get_membership_requests_required() ) ) : ?>
 						<table class="wp-list-table widefat fixed striped">
 							<tbody>
 								<tr>
@@ -2277,7 +2522,7 @@ class BP_Members_Admin {
 
 								<tr>
 									<td class="column-fields"><?php esc_html_e( 'Email', 'buddypress' ); ?></td>
-									<td><?php echo sanitize_email( $signup->user_email ); ?></td>
+									<td><?php echo esc_html( $signup->user_email ); ?></td>
 								</tr>
 
 								<?php if ( bp_is_active( 'xprofile' ) && ! empty( $profile_field_ids ) ) : ?>
@@ -2285,7 +2530,12 @@ class BP_Members_Admin {
 										$field_value = isset( $signup->meta[ "field_{$pid}" ] ) ? $signup->meta[ "field_{$pid}" ] : ''; ?>
 										<tr>
 											<td class="column-fields"><?php echo esc_html( $fdata[ $pid ] ); ?></td>
-											<td><?php echo $this->format_xprofile_field_for_display( $field_value ); ?></td>
+											<td>
+												<?php
+												// phpcs:ignore WordPress.Security.EscapeOutput
+												echo bp_members_admin_format_xprofile_field_for_display( $field_value );
+												?>
+											</td>
 										</tr>
 
 									<?php endforeach;  ?>
@@ -2324,7 +2574,7 @@ class BP_Members_Admin {
 						<p class="description">
 							<?php
 							/* translators: %s: notification date */
-							printf( esc_html__( 'Last notified: %s', 'buddypress'), $last_notified );
+							printf( esc_html__( 'Last notified: %s', 'buddypress'), esc_html( $last_notified ) );
 							?>
 
 							<?php if ( ! empty( $signup->recently_sent ) ) : ?>
@@ -2379,22 +2629,26 @@ class BP_Members_Admin {
 
 		$id_name = 'bottom' === $which ? 'bp_change_type2' : 'bp_change_type';
 
-		$types = bp_get_member_types( array(), 'objects' ); ?>
+		$types = bp_get_member_types( array(), 'objects' );
 
-		<label class="screen-reader-text" for="<?php echo $id_name; ?>"><?php _e( 'Change member type to&hellip;', 'buddypress' ) ?></label>
+		// phpcs:disable WordPress.Security.EscapeOutput
+		?>
+		<label class="screen-reader-text" for="<?php echo $id_name; ?>"><?php esc_html_e( 'Change member type to&hellip;', 'buddypress' ) ?></label>
 		<select name="<?php echo $id_name; ?>" id="<?php echo $id_name; ?>" style="display:inline-block;float:none;">
-			<option value=""><?php _e( 'Change member type to&hellip;', 'buddypress' ) ?></option>
+			<option value=""><?php esc_html_e( 'Change member type to&hellip;', 'buddypress' ) ?></option>
 
-			<?php foreach( $types as $type ) : ?>
+			<?php foreach ( $types as $type ) : ?>
 
 				<option value="<?php echo esc_attr( $type->name ); ?>"><?php echo esc_html( $type->labels['singular_name'] ); ?></option>
 
 			<?php endforeach; ?>
 
-			<option value="remove_member_type"><?php _e( 'No Member Type', 'buddypress' ) ?></option>
+			<option value="remove_member_type"><?php esc_html_e( 'No Member Type', 'buddypress' ) ?></option>
 
 		</select>
 		<?php
+		// phpcs:enable
+
 		wp_nonce_field( 'bp-bulk-users-change-type-' . bp_loggedin_user_id(), 'bp-bulk-users-change-type-nonce' );
 		submit_button( __( 'Change', 'buddypress' ), 'button', 'bp_change_member_type', false );
 	}
@@ -2467,8 +2721,8 @@ class BP_Members_Admin {
 			$redirect = add_query_arg( array( 'updated' => 'member-type-change-success' ), wp_get_referer() );
 		}
 
-		wp_redirect( $redirect );
-		exit();
+		wp_safe_redirect( $redirect );
+		exit;
 	}
 
 	/**
@@ -2555,9 +2809,11 @@ class BP_Members_Admin {
 	/**
 	 * Filter WP Admin users list table to include users of the specified type.
 	 *
-	 * @param WP_Query $query
-	 *
 	 * @since 2.7.0
+	 *
+	 * @global string $pagenow The filename of the current screen.
+	 *
+	 * @param WP_Query $query The WordPress Query object.
 	 */
 	public function users_table_filter_by_type( $query ) {
 		global $pagenow;
@@ -2591,20 +2847,15 @@ class BP_Members_Admin {
 	 * Operates recursively on arrays, which are then imploded with commas.
 	 *
 	 * @since 2.8.0
+	 * @deprecated 10.0.0
 	 *
 	 * @param string|array $value Field value.
 	 * @return string
 	 */
 	protected function format_xprofile_field_for_display( $value ) {
-		if ( is_array( $value ) ) {
-			$value = array_map( array( $this, 'format_xprofile_field_for_display' ), $value );
-			$value = implode( ', ', $value );
-		} else {
-			$value = stripslashes( $value );
-			$value = esc_html( $value );
-		}
+		_deprecated_function( __METHOD__, '10.0.0', 'bp_members_admin_format_xprofile_field_for_display' );
 
-		return $value;
+		return bp_members_admin_format_xprofile_field_for_display( $value );
 	}
 
 	/**
@@ -2616,7 +2867,7 @@ class BP_Members_Admin {
 	 *
 	 * @since 8.0.0
 	 *
-	 * @global $bp_members_invitations_list_table
+	 * @global object $bp_members_invitations_list_table
 	 */
 	public function members_invitations_admin_load() {
 		global $bp_members_invitations_list_table;
@@ -2920,7 +3171,7 @@ class BP_Members_Admin {
 
 			<?php endif; ?>
 
-				<p><?php echo $notice['message']; ?></p>
+				<p><?php echo esc_html( $notice['message'] ); ?></p>
 			</div>
 
 		<?php endif;
@@ -2943,8 +3194,8 @@ class BP_Members_Admin {
 	 *
 	 * @since 8.0.0
 	 *
-	 * @global $plugin_page
-	 * @global $bp_members_invitations_list_table
+	 * @global string $plugin_page
+	 * @global object $bp_members_invitations_list_table
 	 */
 	public function invitations_admin_index() {
 		global $plugin_page, $bp_members_invitations_list_table;
@@ -2990,17 +3241,13 @@ class BP_Members_Admin {
 			), $_SERVER['REQUEST_URI']
 		);
 
+		bp_core_admin_tabbed_screen_header( __( 'BuddyPress tools', 'buddypress' ), __( 'Manage Invitations', 'buddypress' ), 'tools' );
 		?>
 
-		<div class="wrap">
-			<h1 class="wp-heading-inline"><?php esc_html_e( 'BuddyPress tools', 'buddypress' ); ?></h1>
-			<hr class="wp-header-end">
-
-			<h2 class="nav-tab-wrapper"><?php bp_core_admin_tabs( __( 'Manage Invitations', 'buddypress' ), 'tools' ); ?></h2>
-
+		<div class="buddypress-body">
 			<?php
 			if ( $usersearch ) {
-				printf( '<span class="subtitle">' . __( 'Search results for &#8220;%s&#8221;', 'buddypress' ) . '</span>', esc_html( $usersearch ) );
+				printf( '<span class="subtitle">' . esc_html__( 'Search results for &#8220;%s&#8221;', 'buddypress' ) . '</span>', esc_html( $usersearch ) );
 			}
 			?>
 
@@ -3111,11 +3358,11 @@ class BP_Members_Admin {
 			'invitations_' . $action
 		);
 
+		bp_core_admin_tabbed_screen_header( __( 'BuddyPress tools', 'buddypress' ), __( 'Manage Invitations', 'buddypress' ), 'tools' );
 		?>
 
-		<div class="wrap">
-			<h1 class="wp-heading-inline"><?php echo esc_html( $header_text ); ?></h1>
-			<hr class="wp-header-end">
+		<div class="buddypress-body">
+			<h2><?php echo esc_html( $header_text ); ?></h2>
 
 			<p><?php echo esc_html( $helper_text ); ?></p>
 
@@ -3138,7 +3385,7 @@ class BP_Members_Admin {
 								<p class="description">
 									<?php
 									/* translators: %s: notification date */
-									printf( esc_html__( 'Last notified: %s', 'buddypress'), $last_notified );
+									printf( esc_html__( 'Last notified: %s', 'buddypress'), esc_html( $last_notified ) );
 									?>
 								</p>
 

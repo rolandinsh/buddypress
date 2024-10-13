@@ -15,8 +15,9 @@
 function bp_core_screen_signup() {
 	$bp = buddypress();
 
-	if ( ! bp_is_current_component( 'register' ) || bp_current_action() )
+	if ( ! bp_is_current_component( 'register' ) || bp_current_action() ) {
 		return;
+	}
 
 	// Not a directory.
 	bp_update_is_directory( false, 'register' );
@@ -26,7 +27,7 @@ function bp_core_screen_signup() {
 
 		$redirect_to = bp_is_component_front_page( 'register' )
 			? bp_get_members_directory_permalink()
-			: bp_get_root_domain();
+			: bp_get_root_url();
 
 		/**
 		 * Filters the URL to redirect logged in users to when visiting registration page.
@@ -61,7 +62,9 @@ function bp_core_screen_signup() {
 		}
 	}
 
-	if ( ! bp_get_signup_allowed() && ! $active_invite ) {
+	$requests_enabled = bp_get_membership_requests_required();
+
+	if ( ! bp_get_signup_allowed() && ! $active_invite && ! $requests_enabled ) {
 		$bp->signup->step = 'registration-disabled';
 		// If the signup page is submitted, validate and save.
 	} elseif ( isset( $_POST['signup_submit'] ) && bp_verify_nonce_request( 'bp_new_signup' ) ) {
@@ -85,19 +88,34 @@ function bp_core_screen_signup() {
 			$bp->signup->errors['signup_email'] = $account_details['errors']->errors['user_email'][0];
 		}
 
-		$signup_pass = '';
-		if ( isset( $_POST['signup_password'] ) ) {
-			$signup_pass = wp_unslash( $_POST['signup_password'] );
+		// Password strength check.
+		$required_password_strength = bp_members_user_pass_required_strength();
+		$current_password_strength  = null;
+		if ( isset( $_POST['_password_strength_score'] ) ) {
+			$current_password_strength = (int) $_POST['_password_strength_score'];
 		}
 
-		$signup_pass_confirm = '';
-		if ( isset( $_POST['signup_password_confirm'] ) ) {
-			$signup_pass_confirm = wp_unslash( $_POST['signup_password_confirm'] );
+		if ( $required_password_strength && ! is_null( $current_password_strength ) && $required_password_strength > $current_password_strength ) {
+			$account_password = new WP_Error(
+				'not_strong_enough_password',
+				__( 'Your password is not strong enough to be allowed on this site. Please use a stronger password.', 'buddypress' )
+			);
+		} else {
+			$signup_pass = '';
+			if ( isset( $_POST['signup_password'] ) ) {
+				$signup_pass = wp_unslash( $_POST['signup_password'] );
+			}
+
+			$signup_pass_confirm = '';
+			if ( isset( $_POST['signup_password_confirm'] ) ) {
+				$signup_pass_confirm = wp_unslash( $_POST['signup_password_confirm'] );
+			}
+
+			// Check the account password for problems.
+			$account_password = bp_members_validate_user_password( $signup_pass, $signup_pass_confirm );
 		}
 
-		// Check the account password for problems.
-		$account_password = bp_members_validate_user_password( $signup_pass, $signup_pass_confirm );
-		$password_error   = $account_password->get_error_message();
+		$password_error = $account_password->get_error_message();
 
 		if ( $password_error ) {
 			$bp->signup->errors['signup_password'] = $password_error;
@@ -139,7 +157,7 @@ function bp_core_screen_signup() {
 
 				// This situation doesn't naturally occur so bounce to website root.
 			} else {
-				bp_core_redirect( bp_get_root_domain() );
+				bp_core_redirect( bp_get_root_url() );
 			}
 		}
 
@@ -178,17 +196,22 @@ function bp_core_screen_signup() {
 				 * @param string $value     Error message wrapped in html.
 				 * @param string $fieldname The name of the signup field.
 				 */
-				add_action( 'bp_' . $fieldname . '_errors', function() use ( $error_message, $fieldname ) {
-					/**
-					 * Filter here to edit the error message about the invalid field value.
-					 *
-					 * @since 1.5.0
-					 * @since 8.0.0 Adds the `$fieldname` parameter.
-					 *
-					 * @param string $value     Error message wrapped in html.
-					 * @param string $fieldname The name of the signup field.
-					 */
-					echo apply_filters( 'bp_members_signup_error_message', "<div class=\"error\">" . $error_message . "</div>", $fieldname );
+				add_action( 'bp_' . $fieldname . '_errors', function () use ( $error_message, $fieldname ) {
+					echo wp_kses(
+						/**
+						 * Filter here to edit the error message about the invalid field value.
+						 *
+						 * @since 1.5.0
+						 * @since 8.0.0 Adds the `$fieldname` parameter.
+						 *
+						 * @param string $value     Error message wrapped in html.
+						 * @param string $fieldname The name of the signup field.
+						 */
+						apply_filters( 'bp_members_signup_error_message', "<div class=\"error\">" . $error_message . "</div>", $fieldname ),
+						array(
+							'div' => array( 'class' => true ),
+						)
+					);
 				} );
 			}
 		} else {
@@ -197,7 +220,7 @@ function bp_core_screen_signup() {
 			// No errors! Let's register those deets.
 			$active_signup = bp_core_get_root_option( 'registration' );
 
-			if ( 'none' != $active_signup ) {
+			if ( 'none' != $active_signup || $requests_enabled ) {
 
 				// Make sure the extended profiles module is enabled.
 				if ( bp_is_active( 'xprofile' ) ) {
@@ -274,8 +297,11 @@ function bp_core_screen_signup() {
 	 *
 	 * @since 1.5.0
 	 *
-	 * @param string $value Path to the Member registration template to load.
+	 * @param string[] $value Path to the list of Member registration templates to load.
 	 */
-	bp_core_load_template( apply_filters( 'bp_core_template_register', array( 'register', 'registration/register' ) ) );
+	$templates   = apply_filters( 'bp_core_template_register', array( 'register', 'registration/register' ) );
+	$templates[] = 'members/register';
+
+	bp_core_load_template( $templates );
 }
 add_action( 'bp_screens', 'bp_core_screen_signup' );

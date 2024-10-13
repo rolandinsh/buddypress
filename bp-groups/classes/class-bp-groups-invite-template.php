@@ -41,6 +41,14 @@ class BP_Groups_Invite_Template {
 	public $invite;
 
 	/**
+	 * List of invites found and their respective data.
+	 *
+	 * @since 1.1.0
+	 * @var array
+	 */
+	public $invite_data = array();
+
+	/**
 	 * @since 1.1.0
 	 * @var bool
 	 */
@@ -65,6 +73,14 @@ class BP_Groups_Invite_Template {
 	public $pag_links;
 
 	/**
+	 * URL argument used for the pagination param.
+	 *
+	 * @since 1.1.0
+	 * @var string
+	 */
+	public $pag_arg;
+
+	/**
 	 * @since 1.1.0
 	 * @var int
 	 */
@@ -83,7 +99,7 @@ class BP_Groups_Invite_Template {
 		// Backward compatibility with old method of passing arguments.
 		if ( ! is_array( $args ) || count( $function_args ) > 1 ) {
 			/* translators: 1: the name of the method. 2: the name of the file. */
-			_deprecated_argument( __METHOD__, '2.0.0', sprintf( __( 'Arguments passed to %1$s should be in an associative array. See the inline documentation at %2$s for more details.', 'buddypress' ), __METHOD__, __FILE__ ) );
+			_deprecated_argument( __METHOD__, '2.0.0', sprintf( esc_html__( 'Arguments passed to %1$s should be in an associative array. See the inline documentation at %2$s for more details.', 'buddypress' ), __METHOD__, __FILE__ ) );
 
 			$old_args_keys = array(
 				0  => 'user_id',
@@ -93,13 +109,17 @@ class BP_Groups_Invite_Template {
 			$args = bp_core_parse_args_array( $old_args_keys, $function_args );
 		}
 
-		$r = bp_parse_args( $args, array(
-			'page'     => 1,
-			'per_page' => 10,
-			'page_arg' => 'invitepage',
-			'user_id'  => bp_loggedin_user_id(),
-			'group_id' => bp_get_current_group_id(),
-		), 'groups_invite_template' );
+		$r = bp_parse_args(
+			$args,
+			array(
+				'page'     => 1,
+				'per_page' => 10,
+				'page_arg' => 'invitepage',
+				'user_id'  => bp_loggedin_user_id(),
+				'group_id' => bp_get_current_group_id(),
+			),
+			'groups_invite_template'
+		);
 
 		$this->pag_arg  = sanitize_key( $r['page_arg'] );
 		$this->pag_page = bp_sanitize_pagination_arg( $this->pag_arg, $r['page']     );
@@ -197,10 +217,10 @@ class BP_Groups_Invite_Template {
 			 * Fires right before the rewinding of invites list.
 			 *
 			 * @since 1.1.0
-			 * @since 2.3.0 `$this` parameter added.
+			 * @since 2.3.0 `$template_loop` parameter added.
 			 * @since 2.7.0 Action renamed from `loop_start`.
 			 *
-			 * @param BP_Groups_Invite_Template $this Instance of the current Invites template.
+			 * @param BP_Groups_Invite_Template $template_loop Instance of the current Invites template.
 			 */
 			do_action( 'group_invitation_loop_end', $this );
 
@@ -272,7 +292,7 @@ class BP_Groups_Invite_Template {
 		);
 
 		$this->invite->user->email     = $this->invite->user->user_email;
-		$this->invite->user->user_url  = bp_core_get_user_domain( $user_id, $this->invite->user->user_nicename, $this->invite->user->user_login );
+		$this->invite->user->user_url  = bp_members_get_user_url( $user_id );
 		$this->invite->user->user_link = "<a href='{$this->invite->user->user_url}'>{$this->invite->user->fullname}</a>";
 
 		/* translators: %s: last activity timestamp (e.g. "Active 1 hour ago") */
@@ -299,10 +319,10 @@ class BP_Groups_Invite_Template {
 			 * Fires if the current invite item is the first in the loop.
 			 *
 			 * @since 1.1.0
-			 * @since 2.3.0 `$this` parameter added.
+			 * @since 2.3.0 `$template_loop` parameter added.
 			 * @since 2.7.0 Action renamed from `loop_start`.
 			 *
-			 * @param BP_Groups_Invite_Template $this Instance of the current Invites template.
+			 * @param BP_Groups_Invite_Template $template_loop Instance of the current Invites template.
 			 */
 			do_action( 'group_invitation_loop_start', $this );
 		}

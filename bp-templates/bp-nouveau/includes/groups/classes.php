@@ -3,7 +3,7 @@
  * Groups classes
  *
  * @since 3.0.0
- * @version 7.0.0
+ * @version 12.0.0
  */
 
 // Exit if accessed directly.
@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * @since 3.0.0
  */
+#[AllowDynamicProperties]
 class BP_Nouveau_Group_Invite_Query extends BP_User_Query {
 	/**
 	 * Array of group member ids, cached to prevent redundant lookups
@@ -124,7 +125,11 @@ class BP_Nouveau_Group_Invite_Query extends BP_User_Query {
 	}
 
 	/**
+	 * Build the Meta Query to get all members list.
+	 *
 	 * @since 3.0.0
+	 *
+	 * @param BP_User_Query $bp_user_query The User Query object.
 	 */
 	public function build_meta_query( BP_User_Query $bp_user_query ) {
 		if ( isset( $this->query_vars['scope'] ) && 'members' === $this->query_vars['scope'] && isset( $this->query_vars['meta_query'] ) ) {
@@ -142,21 +147,27 @@ class BP_Nouveau_Group_Invite_Query extends BP_User_Query {
 	}
 
 	/**
+	 * Get the list of group invites.
+	 *
 	 * @since 3.0.0
+	 *
+	 * @param integer $user_id  The User ID.
+	 * @param integer $group_id The Group ID.
+	 * @return array            Matching BP_Invitation objects.
 	 */
 	public static function get_inviter_ids( $user_id = 0, $group_id = 0 ) {
-		global $wpdb;
-
 		if ( empty( $group_id ) || empty( $user_id ) ) {
 			return array();
 		}
 
-		return groups_get_invites( array(
-			'user_id'     => $user_id,
-			'item_id'     => $group_id,
-			'invite_sent' => 'sent',
-			'fields'      => 'inviter_ids'
-		) );
+		return groups_get_invites(
+			array(
+				'user_id'     => $user_id,
+				'item_id'     => $group_id,
+				'invite_sent' => 'sent',
+				'fields'      => 'inviter_ids',
+			)
+		);
 	}
 }
 
@@ -167,6 +178,14 @@ class BP_Nouveau_Group_Invite_Query extends BP_User_Query {
  * @since 3.0.0
  */
 class BP_Nouveau_Customizer_Group_Nav extends BP_Core_Nav {
+	/**
+	 * The group being requested.
+	 *
+	 * @since 3.0.0
+	 * @var BP_Groups_Group
+	 */
+	public $group = null;
+
 	/**
 	 * Constructor
 	 *
@@ -259,12 +278,6 @@ class BP_Nouveau_Customizer_Group_Nav extends BP_Core_Nav {
 				'parent_slug' => $this->group->slug,
 				'position'    => 10,
 			),
-			'invites' => array(
-				'name'        => _x( 'Invite', 'My Group screen nav', 'buddypress' ),
-				'slug'        => 'send-invites',
-				'parent_slug' => $this->group->slug,
-				'position'    => 70,
-			),
 			'manage'  => array(
 				'name'        => _x( 'Manage', 'My Group screen nav', 'buddypress' ),
 				'slug'        => 'admin',
@@ -273,6 +286,15 @@ class BP_Nouveau_Customizer_Group_Nav extends BP_Core_Nav {
 			),
 		);
 
+		if ( bp_is_active( 'groups', 'invitations' ) ) {
+			$nav_items['invites'] = array(
+				'name'        => _x( 'Invite', 'My Group screen nav', 'buddypress' ),
+				'slug'        => 'send-invites',
+				'parent_slug' => $this->group->slug,
+				'position'    => 70,
+			);
+		}
+
 		// Make sure only global front.php will be checked.
 		add_filter( '_bp_nouveau_group_reset_front_template', array( $this, 'all_groups_fronts' ), 10, 1 );
 
@@ -280,9 +302,19 @@ class BP_Nouveau_Customizer_Group_Nav extends BP_Core_Nav {
 
 		remove_filter( '_bp_nouveau_group_reset_front_template', array( $this, 'all_groups_fronts' ), 10, 1 );
 
+		$members_nav = array(
+			'name'        => _x( 'Members', 'My Group screen nav', 'buddypress' ),
+			'slug'        => 'members',
+			'parent_slug' => $this->group->slug,
+			'position'    => 60,
+		);
+
 		if ( ! $front_template ) {
 			if ( bp_is_active( 'activity' ) ) {
 				$nav_items['home']['name'] = _x( 'Home (Activity)', 'Group screen navigation title', 'buddypress' );
+
+				// Add the members nav.
+				$nav_items['members'] = $members_nav;
 			} else {
 				$nav_items['home']['name'] = _x( 'Home (Members)', 'Group screen navigation title', 'buddypress' );
 			}
@@ -296,13 +328,8 @@ class BP_Nouveau_Customizer_Group_Nav extends BP_Core_Nav {
 				);
 			}
 
-			// Add the members one
-			$nav_items['members'] = array(
-				'name'        => _x( 'Members', 'My Group screen nav', 'buddypress' ),
-				'slug'        => 'members',
-				'parent_slug' => $this->group->slug,
-				'position'    => 60,
-			);
+			// Add the members nav.
+			$nav_items['members'] = $members_nav;
 		}
 
 		// Required params
@@ -403,7 +430,7 @@ class BP_Nouveau_Group_Meta {
 	 */
 	public function __get( $key = '' ) {
 		/* translators: %s is the name of the function to use instead of the deprecated one */
-		_doing_it_wrong( 'bp_nouveau_group_meta', sprintf( __( 'Please use %s instead', 'buddypress' ), 'bp_nouveau_the_group_meta( array( \'keys\' => \'' . $key . '\' ) )' ) , '7.0.0' );
+		_doing_it_wrong( 'bp_nouveau_group_meta', sprintf( esc_html__( 'Please use %s instead', 'buddypress' ), 'bp_nouveau_the_group_meta( array( \'keys\' => \'' . esc_html( $key ) . '\' ) )' ) , '7.0.0' );
 
 		// Backwards compatibility.
 		return bp_nouveau_the_group_meta( array( 'keys' => $key, 'echo' => false ) );

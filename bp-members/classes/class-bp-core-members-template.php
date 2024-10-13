@@ -110,11 +110,12 @@ class BP_Core_Members_Template {
 	 * Constructor method.
 	 *
 	 * @since 1.5.0
-	 * @since 7.0.0 Added $xprofile_query parameter. Added $user_ids parameter.
+	 * @since 7.0.0 Added `$xprofile_query` parameter. Added `$user_ids` parameter.
+	 * @since 10.0.0 Added `$date_query` parameter.
 	 *
 	 * @see BP_User_Query for an in-depth description of parameters.
 	 *
-	 * @param array $args {
+	 * @param array ...$args {
 	 *     Array of arguments. Supports all arguments of BP_User_Query. Additional
 	 *     arguments, or those with different defaults, are described below.
 	 *
@@ -126,7 +127,7 @@ class BP_Core_Members_Template {
 	public function __construct( ...$args ) {
 		// Backward compatibility with old method of passing arguments.
 		if ( ! is_array( $args[0] ) || count( $args ) > 1 ) {
-			_deprecated_argument( __METHOD__, '7.0.0', sprintf( __( 'Arguments passed to %1$s should be in an associative array. See the inline documentation at %2$s for more details.', 'buddypress' ), __METHOD__, __FILE__ ) );
+			_deprecated_argument( __METHOD__, '7.0.0', sprintf( esc_html__( 'Arguments passed to %1$s should be in an associative array. See the inline documentation at %2$s for more details.', 'buddypress' ), __METHOD__, __FILE__ ) );
 
 			$old_args_keys = array(
 				0  => 'type',
@@ -160,7 +161,7 @@ class BP_Core_Members_Template {
 			'per_page'            => 20,
 			'max'                 => false,
 			'user_id'             => false,
-			'search_terms'        => null,
+			'search_terms'        => '',
 			'include'             => false,
 			'populate_extras'     => true,
 			'exclude'             => false,
@@ -172,8 +173,13 @@ class BP_Core_Members_Template {
 			'member_type__in'     => '',
 			'member_type__not_in' => '',
 			'xprofile_query'      => false,
+			'date_query'          => false,
 		);
-		$r = wp_parse_args( $args, $defaults );
+
+		$r = bp_parse_args(
+			$args,
+			$defaults
+		);
 
 		$this->pag_arg  = sanitize_key( $r['page_arg'] );
 		$this->pag_page = bp_sanitize_pagination_arg( $this->pag_arg, $r['page_number'] );
@@ -200,6 +206,7 @@ class BP_Core_Members_Template {
 					'member_type__in'     => $r['member_type__in'],
 					'member_type__not_in' => $r['member_type__not_in'],
 					'xprofile_query'      => $r['xprofile_query'],
+					'date_query'          => $r['date_query'],
 				)
 			);
 		}
@@ -267,11 +274,8 @@ class BP_Core_Members_Template {
 	 *
 	 * @return bool True if there are items in the loop, otherwise false.
 	 */
-	function has_members() {
-		if ( $this->member_count )
-			return true;
-
-		return false;
+	public function has_members() {
+		return ! empty( $this->member_count );
 	}
 
 	/**
@@ -281,9 +285,9 @@ class BP_Core_Members_Template {
 	 *
 	 * @return object The next member to iterate over.
 	 */
-	function next_member() {
+	public function next_member() {
 		$this->current_member++;
-		$this->member = $this->members[$this->current_member];
+		$this->member = $this->members[ $this->current_member ];
 
 		return $this->member;
 	}
@@ -293,7 +297,7 @@ class BP_Core_Members_Template {
 	 *
 	 * @since 1.0.0
 	 */
-	function rewind_members() {
+	public function rewind_members() {
 		$this->current_member = -1;
 		if ( $this->member_count > 0 ) {
 			$this->member = $this->members[0];
@@ -313,10 +317,10 @@ class BP_Core_Members_Template {
 	 *
 	 * @return bool True if there are more members to show, otherwise false.
 	 */
-	function members() {
+	public function members() {
 		if ( $this->current_member + 1 < $this->member_count ) {
 			return true;
-		} elseif ( $this->current_member + 1 == $this->member_count ) {
+		} elseif ( $this->current_member + 1 === $this->member_count ) {
 
 			/**
 			 * Fires right before the rewinding of members listing.
@@ -343,13 +347,12 @@ class BP_Core_Members_Template {
 	 *
 	 * @see bp_the_member()
 	 */
-	function the_member() {
-
+	public function the_member() {
 		$this->in_the_loop = true;
 		$this->member      = $this->next_member();
 
 		// Loop has just started.
-		if ( 0 == $this->current_member ) {
+		if ( 0 === $this->current_member ) {
 
 			/**
 			 * Fires if the current member is the first in the loop.
@@ -358,6 +361,5 @@ class BP_Core_Members_Template {
 			 */
 			do_action( 'member_loop_start' );
 		}
-
 	}
 }
